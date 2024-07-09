@@ -320,16 +320,12 @@ func ordina(p piano) {
 func pista(p piano, x int, y int, s string) {
 	vertice := punto{x, y}
 	seqDirezioni := strings.Split(s, ",")
-	piastrellePista := make(map[punto]*Piastrella)
-	calcolaPista(p, vertice, seqDirezioni, piastrellePista)
 
-	if len(piastrellePista) > 0 {
-		fmt.Println("[")
-		for _, piastrella := range piastrellePista {
-			fmt.Printf(
-				"%d %d %s %d\n", piastrella.x, piastrella.y, piastrella.colore, piastrella.intensità)
-		}
-		fmt.Println("]")
+	pistaDaStampare := ""
+	calcolaPista(p, vertice, seqDirezioni, &pistaDaStampare)
+
+	if pistaDaStampare != "" {
+		fmt.Printf("[\n%s\n]\n", pistaDaStampare)
 	}
 }
 
@@ -443,15 +439,16 @@ func verificaRegola(p piano, regola *Regola, vertice punto, intensità *int) *Re
 	return regola
 }
 
-// Calcola la pista seguendo le direzioni
-func calcolaPista(p piano, vertice punto, seqDirezioni []string, piastrellePista map[punto]*Piastrella) {
+// Calcola la pista seguendo le direzioni, restituisce nil se la pista non è definita
+func calcolaPista(p piano, vertice punto, seqDirezioni []string, pistaDaStampare *string) {
 	piastrella, ok := p.piastrelle[vertice]
 	if !ok || piastrella.intensità == 0 {
 		return
 	}
 
 	// Aggiungo la piastrella iniziale
-	piastrellePista[vertice] = piastrella
+	*pistaDaStampare = fmt.Sprintf("%d %d %s %d", piastrella.x, piastrella.y,
+		piastrella.colore, piastrella.intensità)
 
 	// seguo le direzioni per spostarmi nel piano e aggiorno la mappa
 	for i := 0; i < len(seqDirezioni); i++ {
@@ -460,9 +457,13 @@ func calcolaPista(p piano, vertice punto, seqDirezioni []string, piastrellePista
 		vertice = calcolaDeltaVertice(vertice, deltaX, deltaY)
 
 		if altraPiastrella, ok := p.piastrelle[vertice]; ok && altraPiastrella.intensità > 0 {
-			piastrellePista[vertice] = altraPiastrella
+			*pistaDaStampare += fmt.Sprintf("\n%d %d %s %d",
+				altraPiastrella.x, altraPiastrella.y,
+				altraPiastrella.colore, altraPiastrella.intensità)
+
 		} else {
-			break
+			*pistaDaStampare = ""
+			return
 		}
 	}
 }
