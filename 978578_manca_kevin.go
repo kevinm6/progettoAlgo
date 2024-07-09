@@ -1,9 +1,9 @@
 /*
 ---
-Title    : Progetto Laboratorio di Algoritmi & Strutture Dati @ Unimi
-Author   : Kevin Manca
-Matricola: 978578
-Data     : 10/07/2024
+Title         : Progetto Laboratorio di Algoritmi & Strutture Dati @ Unimi
+Author        : Kevin Manca
+Matricola     : 978578
+Data Consegna : 10/07/2024
 ---
 */
 package main
@@ -21,7 +21,7 @@ import (
 /************************************ STRUTTURE ******************************************/
 //
 
-// piano => rappresenta il piano, cioè un insieme di piastrelle e regole
+// piano: rappresenta il piano, cioè un insieme di piastrelle e regole
 type Piano struct {
 	piastrelle map[punto]*Piastrella // mappa che rappresenta l'insieme delle piastrelle, { Punto: ->Piastrella }
 	regole     []*Regola             // insieme di regole
@@ -33,28 +33,27 @@ type Piano struct {
 // Inoltre aiuta ad evitare errori nel codice dovuti ai puntatori
 type piano *Piano
 
-// Piastrella => Rappresenta una piastrella del piano
+// Piastrella: rappresenta una piastrella del piano
 type Piastrella struct {
 	x, y      int    // coordinate che identificano la piastrella
 	colore    string // colore della piastrella
 	intensità int    // intensità della piastrella (0: spenta, >1: accesa)
 }
 
-// punto => Rappresenta un vertice con coordinate (x, y)
+// punto: Rappresenta un vertice con coordinate (x, y)
 type punto struct {
 	x, y int
 }
 
-// Regola => regola
+// Regola: regola
 type Regola struct {
-	istruzioneCompleta string // stringa della regola completa
-	// elementi  []elemRegola   // insieme di istruzioni che compongono la regola
-	colore    string         // nuovo colore della regola
-	consumo   uint           // numero tot di piastrelle a cui è stata applicata la regola
-	valColore map[string]int // mappa il colore col relativo valore
+	istruzioneCompleta string         // stringa della regola completa
+	colore             string         // nuovo colore della regola
+	consumo            uint           // numero tot di piastrelle a cui è stata applicata la regola
+	valColore          map[string]int // mappa il colore col relativo valore
 }
 
-// elemRegola => istruzioni della regola (formato: k₁α₁ + k₂α₂ + ... + kₙαₙ → β)
+// elemRegola : istruzioni della regola (formato: k₁α₁ + k₂α₂ + ... + kₙαₙ → β)
 type elemRegola struct {
 	k     int    // kᵢ sono interi positivi la cui somma non supera 8
 	alpha string // stringa dell'alfabeto tutte differenti tra loro
@@ -78,18 +77,21 @@ var direzioni = map[string]punto{
 /************************************** MAIN ********************************************/
 func main() {
 
-	// Crea e inizializza un piano vuoto e le regole (vuote)
+	// Crea e inizializza un piano e le regole
 	p := Piano{
 		piastrelle: make(map[punto]*Piastrella),
 		regole:     make([]*Regola, 0),
 	}
 
+	// Leggo da stdin, non effettuo un controllo dell'input,
+	//   in quanto da specifica è garantito corretto
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		row := scanner.Text()
 		esegui(&p, row)
 	}
 
+	// Stampo un errore esclusivamente nel caso ci sia stato un problema con lo scanner
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error reading from stdin: ", err)
 	}
@@ -98,10 +100,9 @@ func main() {
 //
 /************************************* ESEGUI *******************************************/
 func esegui(p piano, s string) {
-	flags := strings.Fields(s)
-	var x, y int
+	flags := strings.Fields(s) // restituisce la stringa in input come array di stringhe separate da spazi
+	var x, y int               // inizializzo le variabili che rappresentano le coordinate
 
-	// fmt.Println("flags => ", flags)
 	if len(flags) > 2 {
 		x, _ = strconv.Atoi(flags[1])
 		y, _ = strconv.Atoi(flags[2])
@@ -156,6 +157,7 @@ func esegui(p piano, s string) {
 		quit()
 
 	default:
+		fmt.Println("Input non riconosciuto!")
 		return
 	}
 }
@@ -178,12 +180,10 @@ func spegni(p piano, x int, y int) {
 	P := punto{x, y}
 	if tile := p.piastrelle[P]; tile.intensità > 0 {
 		tile.intensità = 0
-		// fmt.Printf("Piastrella(%d, %d) spenta con successo", tile.x, tile.y)
 	}
 }
 
-// Definisce la regola di propagazione {@type istruzioneRegola}
-// inserisce in fondo all’elenco delle regole.
+// Definisce la regola di propagazione e la inserisce in fondo all’elenco delle regole.
 func regola(p piano, r string) {
 	istruzioni := strings.Fields(r)
 	colore := istruzioni[0]
@@ -257,24 +257,13 @@ func blocco(p piano, x int, y int, omogeneo bool, stampaRisultato bool) (circonv
 func propaga(p piano, x int, y int) {
 	vertice := punto{x, y}
 
-	// piastrella, ok := p.piastrelle[vertice]
-	// if !ok {
-	// 	piastrella = &Piastrella{x: vertice.x, y: vertice.y, colore: "", intensità: 1}
-	// }
-	// println("CALLED PROPAGA")
-
-	// if !ok { //|| piastrella.intensità == 0 {
-	// 	return
-	// }
 	intensità := 1
 
-	for _, r := range p.regole {
-		if regola := verificaRegola(p, r, vertice, &intensità); regola != nil {
-			// fmt.Println("Trovata regola da applicare! => ", regola.colore, regola.consumo)
-			// Applico solo la prima regola valida e incremento il suo consumo
-			// fmt.Println(piastrella)
-			// colora(p, x, y, regola.colore, p.piastrelle[vertice].intensità)
-			regola.consumo++
+	for _, regolaDaValidare := range p.regole {
+		// Applico solo la prima regolaValida valida e incremento il suo consumo
+		if regolaValida := verificaRegola(p, regolaDaValidare, vertice, &intensità); regolaValida != nil {
+			colora(p, x, y, regolaValida.colore, intensità)
+			regolaValida.consumo++
 			break
 		}
 	}
@@ -286,11 +275,12 @@ func propagaBlocco(p piano, x int, y int) {
 
 	_, ok := p.piastrelle[vertice]
 	if !ok {
-		// Se la piastrella è spenta, non proseguo
-		return
+		return // Se la piastrella è spenta, non proseguo
 	}
+
 	visite := make(map[punto]bool)
 	blocco := make(map[punto]*Piastrella)
+	// Calcolo le piastrelle del blocco con la `DFS` che mi aggiorna la mappa `blocco`
 	dfs(p, vertice, visite, blocco, false, nil)
 
 	if len(blocco) > 0 {
@@ -301,10 +291,10 @@ func propagaBlocco(p piano, x int, y int) {
 
 			coordinate := punto{vertice.x, vertice.y}
 			intensità := 1
-			for _, r := range p.regole {
-				if regola := verificaRegola(p, r, coordinate, &intensità); regola != nil {
-					colora(p, coordinate.x, coordinate.y, regola.colore, p.piastrelle[vertice].intensità)
-					r.consumo++
+			for _, regolaDaValidare := range p.regole {
+				if regolaValida := verificaRegola(p, regolaDaValidare, coordinate, &intensità); regolaValida != nil {
+					colora(p, coordinate.x, coordinate.y, regolaValida.colore, p.piastrelle[vertice].intensità)
+					regolaValida.consumo++
 				}
 			}
 		}
@@ -315,13 +305,13 @@ func propagaBlocco(p piano, x int, y int) {
 // regole stesse: la regola con consumo maggiore diventa l’ultima dell’elenco.
 // Se due regole hanno consumo uguale mantengono il loro ordine relativo.
 func ordina(p piano) {
-	// NOTE: SliceStable, come riportato sui [docs di go](https://pkg.go.dev/sort#SliceStable)
-	//     	 non modifica l'ordine originale
+	// NOTE:
+	// SliceStable, come riportato sui [docs di go](https://pkg.go.dev/sort#SliceStable)
+	//   non modifica l'ordine originale
 	sort.SliceStable(p.regole, func(i, j int) bool {
-		// fmt.Println("regole => ", p.regole[i].colore, p.regole[i].consumo)
 		consumoI := p.regole[i].consumo
 		consumoJ := p.regole[j].consumo
-		return consumoI < consumoJ
+		return (consumoI == consumoJ) && i < j || consumoI < consumoJ
 	})
 }
 
@@ -333,7 +323,7 @@ func pista(p piano, x int, y int, s string) {
 	piastrellePista := make(map[punto]*Piastrella)
 	calcolaPista(p, vertice, seqDirezioni, piastrellePista)
 
-	if piastrellePista != nil {
+	if len(piastrellePista) > 0 {
 		fmt.Println("[")
 		for _, piastrella := range piastrellePista {
 			fmt.Printf(
@@ -353,7 +343,7 @@ func lung(p piano, x1 int, y1 int, x2 int, y2 int) {
 	pistaBreve := make(map[punto]*Piastrella)
 	lunghezza := calcolaPistaBreve(p, verticeOrig, verticeDest, pistaBreve)
 
-	if pistaBreve != nil && lunghezza > 0 {
+	if len(pistaBreve) > 0 && lunghezza > 0 {
 		fmt.Println(lunghezza)
 	}
 }
@@ -362,6 +352,18 @@ func lung(p piano, x1 int, y1 int, x2 int, y2 int) {
 /******************************** HELPER FUNCTIONS **************************************/
 //
 
+// Funzione creata per effettuare un wrap di un operazione usata
+// in numerosi punti del codice ed evitare ripetizioni.
+func calcolaDeltaVertice(origine punto, deltaX int, deltaY int) (destinazione punto) {
+	destinazione = punto{origine.x + deltaX, origine.y + deltaY}
+
+	return destinazione
+}
+
+// DFS utilizzata dalle funzioni `blocco()`, `propagaBlocco()` per ottenere le piastrelle
+// Utilizzo un check-nil per capire cosa calcolare.
+// Non restituisce nulla, proprio per il fatto di essere versatile ed effettuare le modifiche
+// sui valori originali passati per parametro quando necessario
 func dfs(
 	p piano,
 	vertice punto,
@@ -374,7 +376,7 @@ func dfs(
 	colore := p.piastrelle[vertice].colore
 
 	for _, direzione := range direzioni {
-		nuovoVertice := punto{vertice.x + direzione.x, vertice.y + direzione.y}
+		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
 
 		if circonvicina, ok := p.piastrelle[nuovoVertice]; ok && !visite[nuovoVertice] && circonvicina.intensità > 0 {
 			if !omogeneo || (omogeneo && circonvicina.colore == colore) {
@@ -390,24 +392,28 @@ func dfs(
 	}
 }
 
-// Restituisce le piastrelle circonvicine alla Piastrella(punto.x, punto.y)
-func piastrelleCirconvicine(p piano, vertice punto, vicine map[punto]*Piastrella) {
+// Funzione che calcola le piastrelle circonvicine alla Piastrella(x, y)
+// Restituisce la mappa `vicine`
+func piastrelleCirconvicine(p piano, vertice punto) (vicine map[punto]*Piastrella) {
+	vicine = make(map[punto]*Piastrella)
+
 	for _, direzione := range direzioni {
-		nuovoVertice := punto{vertice.x + direzione.x, vertice.y + direzione.y}
+		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
 
 		if piastrella, ok := p.piastrelle[nuovoVertice]; ok {
 			vicine[nuovoVertice] = piastrella
 		}
 	}
-	return
+	return vicine
 }
 
 // Calcola e mappa il numero di colori dell'intorno
 func calcolaColoriCirconvicine(p piano, vertice punto) map[string]int {
 	colori := make(map[string]int)
-	circonvicine := make(map[punto]*Piastrella)
-	piastrelleCirconvicine(p, vertice, circonvicine)
+	circonvicine := piastrelleCirconvicine(p, vertice)
 
+	// Per tutte le piastrelle circonvicine aggiorno la mappa dei colori, per conoscere
+	// il valore dei colori dell'intorno
 	for _, piastrella := range circonvicine {
 		colori[piastrella.colore]++
 	}
@@ -415,16 +421,20 @@ func calcolaColoriCirconvicine(p piano, vertice punto) map[string]int {
 }
 
 // Verifica che una regola sia applicabile in base ai colori circostanti
+// return: nil se nessuna regola è valida, altrimenti un puntatore alla regola
 func verificaRegola(p piano, regola *Regola, vertice punto, intensità *int) *Regola {
 	valoriColore := calcolaColoriCirconvicine(p, vertice)
 
+	// Verifico che l'insieme dei valori dei colori della regola sia minore
+	// del valore delle piastrelle circonvicine, altrimenti non posso applicare la regola
 	for colore, val := range regola.valColore {
 		if valoriColore[colore] < val {
 			return nil
 		}
 	}
 
-	// Controllo se la piastrella esiste ed è accesa, altrimenti l'intensità sarà 1 di default
+	// Controllo se la piastrella esiste ed è accesa, in quel caso l'intensità sarà la stessa
+	// della piastrella, altrimenti l'intensità sarà 1 di default
 	piastrella, piastrellaOk := p.piastrelle[vertice]
 	if piastrellaOk {
 		*intensità = piastrella.intensità
@@ -443,11 +453,12 @@ func calcolaPista(p piano, vertice punto, seqDirezioni []string, piastrellePista
 	// Aggiungo la piastrella iniziale
 	piastrellePista[vertice] = piastrella
 
+	// seguo le direzioni per spostarmi nel piano e aggiorno la mappa
 	for i := 0; i < len(seqDirezioni); i++ {
 		deltaX := direzioni[seqDirezioni[i]].x
 		deltaY := direzioni[seqDirezioni[i]].y
-		vertice = punto{vertice.x + deltaX, vertice.y + deltaY}
-		// fmt.Println("CALLED ON => ", vertice, direzione)
+		vertice = calcolaDeltaVertice(vertice, deltaX, deltaY)
+
 		if altraPiastrella, ok := p.piastrelle[vertice]; ok && altraPiastrella.intensità > 0 {
 			piastrellePista[vertice] = altraPiastrella
 		} else {
@@ -456,56 +467,8 @@ func calcolaPista(p piano, vertice punto, seqDirezioni []string, piastrellePista
 	}
 }
 
-// func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto, pistaBreve map[punto]*Piastrella) int {
-// 	piastrellaOrig, origineOk := p.piastrelle[verticeOrig]
-// 	piastrellaDest, destOk := p.piastrelle[verticeDest]
-//
-// 	// If the origin or destination tiles are not valid or not lit, return nil.
-// 	if (!origineOk || piastrellaOrig.intensità == 0) || (!destOk || piastrellaDest.intensità == 0) {
-// 		return 0
-// 	}
-//
-// 	// Initialization
-// 	visitate := make(map[punto]bool)
-// 	precedenti := make(map[punto]punto)
-// 	queue := []punto{verticeOrig}
-// 	visitate[verticeOrig] = true
-//
-// 	// BFS with a queue
-// 	for len(queue) > 0 {
-// 		vertice := queue[0]
-// 		queue = queue[1:]
-//
-// 		if vertice == verticeDest {
-// 			// Reconstruct the shortest path
-// 			piastrelle := []Piastrella{}
-// 			for v := vertice; v != verticeOrig; v = precedenti[v] {
-// 				piastrelle = append([]Piastrella{*p.piastrelle[v]}, piastrelle...)
-// 			}
-// 			piastrelle = append([]Piastrella{*piastrellaOrig}, piastrelle...)
-//
-// 			for _, piast := range piastrelle {
-// 				puntoPiastrella := punto{piast.x, piast.y}
-// 				pistaBreve[puntoPiastrella] = &piast
-// 			}
-// 			return len(piastrelle)
-// 		}
-//
-// 		adiacenti := make(map[punto]*Piastrella)
-// 		piastrelleCirconvicine(p, vertice, adiacenti)
-// 		for _, piastrella := range adiacenti {
-// 			coordinatePiastrella := punto{piastrella.x, piastrella.y}
-// 			if !visitate[coordinatePiastrella] {
-// 				queue = append(queue, coordinatePiastrella)
-// 				visitate[coordinatePiastrella] = true
-// 				precedenti[coordinatePiastrella] = vertice
-// 			}
-// 		}
-// 	}
-//
-// 	return 0
-// }
-
+// Calcola la pista più breve, utilizza una `BFS` che aggiorna la mappa `pistaBreve`
+// return: la lunghezza della pista più breve, 0 altrimenti
 func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto, pistaBreve map[punto]*Piastrella) int {
 	piastrellaOrig, origineOk := p.piastrelle[verticeOrig]
 	piastrellaDest, destOk := p.piastrelle[verticeDest]
@@ -520,6 +483,7 @@ func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto, pistaBreve
 	visitate := make(map[punto]bool)
 	precedenti := make(map[punto]punto)
 	queue := []punto{verticeOrig}
+	// Aggiungo il primo vertice di origine alla mappa delle visite
 	visitate[verticeOrig] = true
 
 	// BFS
@@ -528,22 +492,16 @@ func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto, pistaBreve
 		queue = queue[1:]
 
 		if vertice == verticeDest {
-			// Reconstruct the shortest path
-			piastrelle := []Piastrella{}
+			// Ricostruisco il percorso più breve
 			for v := vertice; v != verticeOrig; v = precedenti[v] {
-				piastrelle = append([]Piastrella{*p.piastrelle[v]}, piastrelle...)
+				pistaBreve[v] = p.piastrelle[v]
 			}
-			piastrelle = append([]Piastrella{*piastrellaOrig}, piastrelle...)
+			pistaBreve[verticeOrig] = piastrellaOrig // Aggiungo la piastrella d'origine
 
-			// for _, piast := range piastrelle {
-			// 	vertPiastrella := punto{piast.x, piast.y}
-			// 	pistaBreve[vertPiastrella] = &piast
-			// }
-			return len(piastrelle)
+			return len(pistaBreve)
 		}
 
-		adiacenti := make(map[punto]*Piastrella)
-		piastrelleCirconvicine(p, vertice, adiacenti)
+		adiacenti := piastrelleCirconvicine(p, vertice)
 		for _, piastrella := range adiacenti {
 			coordinatePiastrella := punto{piastrella.x, piastrella.y}
 			if !visitate[coordinatePiastrella] {
