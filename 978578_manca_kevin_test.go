@@ -43,7 +43,7 @@ func LanciaGenericaConFileInOutAtteso(t *testing.T, prog string, inputFile strin
 	}
 }
 
-// DISABLED => consecutive `go test` runs doesn't return consistent results.
+// FIX: DISABLED => consecutive `go test` runs doesn't return consistent results.
 // func TestBuildProject(t *testing.T) {
 // 	cmd := exec.Command("go", "build")
 // 	err := cmd.Run()
@@ -56,8 +56,8 @@ func TestBaseColoraStato(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
 		prog,
-		"./test/myTests/input/BaseColoraStato",
-		"./test/myTests/expected/BaseColoraStato",
+		"./test/input/BaseColoraStato",
+		"./test/expected/BaseColoraStato",
 		verbose,
 	)
 }
@@ -66,8 +66,8 @@ func TestBaseRegole(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
 		prog,
-		"./test/myTests/input/BaseRegole",
-		"./test/myTests/expected/BaseRegole",
+		"./test/input/BaseRegole",
+		"./test/expected/BaseRegole",
 		verbose,
 	)
 }
@@ -76,8 +76,18 @@ func TestBaseBlocco(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
 		prog,
-		"./test/myTests/input/BaseBlocco",
-		"./test/myTests/expected/BaseBlocco",
+		"./test/input/BaseBlocco",
+		"./test/expected/BaseBlocco",
+		verbose,
+	)
+}
+
+func TestBaseBlocco2(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/BaseBlocco2",
+		"./test/expected/BaseBlocco2",
 		verbose,
 	)
 }
@@ -86,8 +96,8 @@ func TestBasePropaga(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
 		prog,
-		"./test/myTests/input/BasePropaga",
-		"./test/myTests/expected/BasePropaga",
+		"./test/input/BasePropaga",
+		"./test/expected/BasePropaga",
 		verbose,
 	)
 }
@@ -96,8 +106,18 @@ func TestBasePropaga2(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
 		prog,
-		"./test/myTests/input/BasePropaga2",
-		"./test/myTests/expected/BasePropaga2",
+		"./test/input/BasePropaga2",
+		"./test/expected/BasePropaga2",
+		verbose,
+	)
+}
+
+func TestBasePropaga3(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/BasePropaga3",
+		"./test/expected/BasePropaga3",
 		verbose,
 	)
 }
@@ -106,8 +126,18 @@ func TestBasePista(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
 		prog,
-		"./test/myTests/input/BasePista",
-		"./test/myTests/expected/BasePista",
+		"./test/input/BasePista",
+		"./test/expected/BasePista",
+		verbose,
+	)
+}
+
+func TestBasePista2(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/BasePista2",
+		"./test/expected/BasePista2",
 		verbose,
 	)
 }
@@ -116,8 +146,8 @@ func TestBaseBloccoOrdina(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
 		prog,
-		"./test/myTests/input/BasePropagaBloccoOrdina",
-		"./test/myTests/expected/BasePropagaBloccoOrdina",
+		"./test/input/BasePropagaBloccoOrdina",
+		"./test/expected/BasePropagaBloccoOrdina",
 		verbose,
 	)
 }
@@ -126,8 +156,8 @@ func TestBaseSpegni(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
 		prog,
-		"./test/myTests/input/BaseSpegni",
-		"./test/myTests/expected/BaseSpegni",
+		"./test/input/BaseSpegni",
+		"./test/expected/BaseSpegni",
 		verbose,
 	)
 }
@@ -136,8 +166,8 @@ func TestBaseSpegni2(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
 		prog,
-		"./test/myTests/input/BaseSpegni2",
-		"./test/myTests/expected/BaseSpegni2",
+		"./test/input/BaseSpegni2",
+		"./test/expected/BaseSpegni2",
 		verbose,
 	)
 }

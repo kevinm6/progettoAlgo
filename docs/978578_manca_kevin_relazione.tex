@@ -1,22 +1,412 @@
-\documentclass[13pt]{article}
+\documentclass{article}
 
+\usepackage{listings}
+\usepackage{xcolor}
 \usepackage{caption}
 \usepackage{float}
+\usepackage[a4paper,margin=3.5cm]{geometry}
 \usepackage{hyperref}
+\hypersetup{%
+  colorlinks=true,% hyperlinks will be coloured
+  linkcolor=black,% hyperlink text will be green
+  linkbordercolor=red,% hyperlink border will be red
+}
 
+\title{Relazione Progetto Algoritmi\\ (Piastrelle Digitali)}
 \author{Kevin Manca, matricola 978578}
-\date{\today}
-\title{Relazione Progetto Algoritmi - Luglio 2024}
+\date{10 Luglio 2024}
 
 \begin{document}
 \maketitle
 \tableofcontents
 
-\section{Requisiti}
+\section{Introduzione}\label{sec:intro}
+Questo documento contiene una panoramica e la documentazione relativa alle strutture dati, gli algoritmi scelti (con i costi a loro associati), come è stato modellato il problema indicato nella specifica, oltre ad opportune scelte implementative.\\
+Insieme a questo documento, sono presenti all'interno dell'archivio \texttt{978578\_manca\_kevin.zip}
+altri file richiesti dalla specifica:
+ 
+ - File go: \texttt{978578\_manca\_kevin.go} contenente il codice sorgente
+ 
+ - File di test go: \texttt{978578\_manca\_kevin\_test.go} che contiene le funzioni utili a testare il programma
 
-\section{Introduzione}
+ - Cartella di test: \texttt{test/} che contiene ulteriori sottocartelle con i file utilizzati per il testing del programma
 
-\subsection{}
+ - File \texttt{go.mod}: utilizzato principalmente per definire modulo e versione di go e per l'utilizzo di \texttt{go test} da linea di comando
+
+
+\subsection{Problema}
+Il problema imposto dalla specifica è quello di studiare le configurazioni di insiemi di piastrelle digitali su un piano, e la loro influenza sulle piastrelle circonvicine.\\
+In questa sezione viene fatta una panoramica relativa alla specifica ed alcuni concetti presenti in questo documento e come sono stati modellati per una possibile soluzione al problema.  
+
+\subsubsection{Piano e Piastrelle}\label{sec:tiles}
+Il \textbf{piano} è suddiviso in quadrati di lato unitario, ciascuno dei quali è occupato da una \textbf{piastrella}, la quale può essere \textit{accesa} o \textit{spenta}.
+La \textit{piastrella(a, b)} rappresenta la piastrella di lato unitario con vertici $(a, b),\ (a + 1, b),\ (a + 1, b + 1),\ (a, b + 1)$.\\
+Ogni piastrella è inoltre caratterizzata da un \textit{colore}, quando una piastrella è accesa appare colorata.\\
+Il colore è l'insieme dei colori disponibili sulle stringhe dell'alfabeto.\\
+Ogni piastrella può inoltre avere un'intensità differente (indicata con un \textit{numero intero}).\\
+Due piastrelle sono dette \textbf{circonvicine} se hanno in comune almeno un vertice.
+
+\subsubsection{Blocco}
+Il \textbf{blocco} è una regione massimale di \textit{piastrelle accese}. Il blocco di appartenenza della \textit{Piastrella(x, y)} è il blocco che la contiene.
+Definiamo inoltre un \textbf{blocco omogeneo} come un \textit{blocco} nel quale tutte le piastrelle accese hanno il medesimo colore.
+
+\subsubsection{Propagazione del colore}
+L’intorno della piastrella \textit{p} è l’insieme di tutte le piastrelle \textit{circonvicine} ad \textit{p} e differenti da \textit{p}.
+Possiamo quindi definire \textit{regole di propagazione} del tipo $k_{1} \alpha_{1} + k_{2}\alpha_{2} + \ldots + k_{n}\alpha_{n} \rightarrow \beta$\\
+dove n è un intero, $\alpha_{1}, \ldots , \alpha_{n}$ sono stringhe sull’alfabeto ${a, b, \ldots , z}$ tutte differenti tra loro, $\beta$ è una stringa sull’alfabeto ${a, b, . . . , z}$, $k_i$ sono interi positivi la cui somma non supera 8.
+Una regola è applicabile a una piastrella \textit{p} se il suo intorno contiene almeno $k_{i}$ piastrelle di colore $\alpha_{i}, \forall i \in \{1, \ldots, n\}$.\\
+L'applicazione della regola cambia in $\beta$ il colore della piastrella \textit{p}.
+Le regole di propagazione vengono memorizzate in ordine cronologico di inserimento (\textit{FIFO}).\\
+È possibile inoltre \textit{propagare i colori} su un blocco: per ogni piastrella colorata \textit{p} che appartiene al blocco, si applica la prima regola applicabile su p rispetto all'intorno di \textit{p} come risulta prima dell'inizio della procedura di propagazione sul blocco.\\
+Durante l’esecuzione definiamo \textit{consumo} di una regola la quantità determinata dal numero totale di piastrelle a cui la regola è stata applicata dal momento della sua definizione.
+
+\section{Modellazione}
+
+\subsection*{Generale e blocchi}
+Il problema è stato modellato come un \textit{grafo} non orientato; indicando il grafo come $G = (V, E)$ dove:
+\begin{itemize}
+  \item \textit{V}: l'insieme dei vertici, ovvero una piastrella
+  \item \textit{E}: insieme degli archi che in questo caso rappresentano il punto in comune tra le piastrelle
+\end{itemize}
+
+Gli \textit{archi} non sono orientati, in quanto è possibile partire da qualsiasi vertice per definire un blocco, e non sono pesati.
+\\ \\
+I blocchi e blocchi omogenei comportano una visita nel \textit{grafo}, per identificare le piastrelle circonvicine e quindi quelle contenute nel blocco, ma anche per verificarne l'intensità e il loro colore (blocco omogeneo).\\
+Una possibile applicazione di questa visita, che poi è quella utilizzata nel progetto, è quella della \textbf{D}epth \textbf{F}irst \textbf{S}earch (o ricerca in profondità) che fissa un vertice origine (ovvero una piastrella), segna come visitato tale vertice, esplora i vertici vicini non visitati e continua in modo ricorsivo fino a quando non trova un vertice che non ne ha altri non visitati.
+
+\subsection*{Propagazione}
+Relativamente alla \textit{propagazione di colore} da una \textit{piastrella (x, y)}, è necessario prima verificare la validità delle regole (individualmente), andando quindi a calcolare i valori delle piastrelle circonvicine a quella di partenza e compararli con la regola.\\
+Una regola sarà valida e potrà essere applicata se l'intorno di piastrelle circonvicine è sufficiente per eseguirla.\\
+Mentre per la \textit{propagazione sul blocco}, è necessario iterare su ogni singola piastrella appartenente al blocco e applicare ad essa la prima \textit{regola valida}.
+
+\subsection*{Pista}\label{sec:pista}
+La modellazione scelta per la pista è quella di un \textit{cammino in un grafo}, del quale si è a conoscenza del punto di origine ($piastrella(x_1,\ y_1)$) e di arrivo ($piastrella(x_2,\ y_2)$).\\
+La \textit{pista più breve} invece può essere rappresentata come il \textit{cammino minimo nel grafo} tra due vertici (\textit{piastrelle}).\\
+Trattandosi di un grafo non pesato, la soluzione ideata è quella di applicare la \textbf{B}readth \textbf{F}irst \textbf{S}earch (o ricerca in ampiezza), che differentemente dalla \textit{DFS} esplora i vertici vicini (adiacenti) prima di continuare l'esplorazione in quelli più lontani, in modo da garantire che il percorso risultante sia quello più breve.
+
+\subsubsection*{Lunghezza}
+La \textit{lunghezza} di una \textit{pista} richiesta dalla specifica, rappresenta la distanza tra i vertici e può essere definita (con la modellazione data) come il numero di archi della pista \(+ 1\), quindi il valore del \textit{cammino \(+ 1\)}.
+
+\section{Strutture Dati}
+Di seguito sono riportate le \textit{strutture dati} utilizzate e le relative stime dei costi spaziali.
+Sono presenti inoltre, nel codice sorgente, ulteriori commenti utili a chiarire alcuni aspetti e scelte adottate.
+
+\subsection*{Piano}
+La struttura \texttt{Piano} (modellato come grafo) rappresenta un piano costituito da piastrelle e regole. Utilizzo una mappa (\texttt{map[punto]*Piastrella}) per memorizzare le piastrelle e una slice (\texttt{*[]Regola}) per le regole.
+Memorizzo solo le piastrelle \textit{accese}, ciò comporta che quelle \textit{spente} risultano inesistenti e vengono aggiunte alla mappa esclusivamente se vengono accese.
+
+\begin{itemize}
+  \item \texttt{piastrelle}: \(O(n)\), \(n\) numero di piastrelle
+  \item \texttt{regole}: \(O(m)\), \(m\) numero di regole
+\end{itemize}
+\textbf{Spazio totale}: \(O(n) + O(m)\)
+\\ \\
+L'implementazione scelta è dovuta ad alcune considerazioni in merito ad altre rappresentazioni possibili.
+Nello specifico:
+\begin{itemize}
+  \item \textit{matrice di incidenza/adiacenza}: essendo il piano potenzialmente infinito (da specifica), lo spazio occuperebbe \(O(n^2)\) con \textit{n} numero di vertici
+  \item \textit{lista di incidenza/adiacenza}: l'operazione di inserimento (eseguita spesso) avrebbe comportato l'utilizzo di \textit{append()} e quindi un tempo pari a \(O(1^*)\)
+\end{itemize}
+
+I vantaggi quindi dell'implementazione utilizzata sono una \textit{maggiore efficienza di spazio e tempo}, infatti attraverso le mappe utilizzate le operazioni di \textit{inserimento}, \textit{accesso} e \textit{modifica} sono in tempo costante.
+
+\subsection*{Piastrella}
+Rappresenta una singola \texttt{piastrella} con coordinate (\textit{(x int, y int)}), colore (\textit{string}) e intensità (\textit{int}).\\
+Le coordinate della piastrella indicano il \textit{vertice di origine} (in basso a sinistra), il colore è semplicemente la stringa sull'alfabeto e l'intensità è un numero intero \(\geq 0\) (\(0\) indica che la piastrella è \textit{spenta}).
+\\ \\
+\textbf{Spazio totale}: \(O(1)\) per ogni piastrella (\textit{3 interi + 1 stringa})
+
+\subsection*{Punto}
+Rappresenta un punto con coordinate (\textit{(x int, y int)}), ovvero un vertice del grafo.\\ \\
+\textbf{Spazio totale}: \(O(1)\) per ogni \textit{punto} (tipo \textit{intero})
+
+\subsection*{Regola}\label{subsec:rule}
+Rappresenta una \texttt{regola} di propagazione con una stringa completa (\textit{istruzioneCompleta string}), un colore (\textit{string}), un consumo (\textit{uint}) e una mappa dei valori di colore (\textit{map[string]int}).\\
+Rispetto alla specifica ho scelto di aggiungere la mappa dei valori (\textit{valColore}) che mi risulta utile nel verificare ad esempio la possibilità di applicare una regola.\\ \\
+\textbf{Spazio totale}: \(O(k)\), \(k\) numero di colori nella mappa \texttt{valColore}
+
+\section{Funzioni}\label{sec:funcs}
+
+\subsection{colora}\label{subsec:color}
+Colora una piastrella specifica identificata dalle coordinate (\(x, y\)) con un dato colore (\textit{alpha}) e intensità (\textit{i}).\\ \\
+\textbf{Tempo}: \(O(1)\) per aggiungere/aggiornare una piastrella nella mappa\\
+\textbf{Spazio}: \(O(1)\), aggiunge una singola piastrella alla mappa
+
+\subsection{spegni}
+Spegne una piastrella, impostando la sua intensità a zero.\\ \\
+\textbf{Tempo}: \(O(1)\) per aggiornare l'intensità della piastrella\\
+\textbf{Spazio}: \(O(1)\), non aggiunge nuove piastrelle
+
+\subsection{regola}
+Aggiunge una nuova regola (\textit{r}) di propagazione al piano. Questa operazione viene fatta ottenendo prima le istruzioni della regola, iterando su di esse e successivamente aggiungendo la regola alla slice.\\ \\
+\textbf{Tempo}: \(O(n)\), \(n\) lunghezza della stringa della regola \textit{r}
+\begin{itemize}
+  \item \(O(n)\), \textit{strings.Fields(r)} 
+  \item \(O(1)\), creazione della mappa dei valori
+  \item \(O(t)\), iterazione sulle istruzioni con \textit{t} pari al numero di istruzioni
+  \item \(O(1^*)\), append della regola alla slice di regole in tempo ammortizzato (se nel caso peggiore la slice debba essere ridimensionata)
+\end{itemize}
+\textbf{Spazio}: \(O(t)\), \textit{t} numero di istruzioni della regola
+
+\subsection{stato}
+Stampa e restituisce il colore e l’intensità di una piastrella identificata dalle coordinate (\(x,\ y\)).\\
+Se la piastrella è \textit{spenta}, non stampa nulla e restituisce la stringa vuota e l'intero \(0\).\\ \\
+\textbf{Tempo}: \(O(1)\), accesso diretto alla mappa\\
+\textbf{Spazio}: \(O(1)\), non modifica/utilizza strutture dati aggiuntive
+
+\subsection{stampa}
+Stampa tutte le regole di propagazione, nell'ordine attuale.\\
+Viene effettuata un iterazione sulle regole del \textit{piano} ed effettuo poi una divisione della stringa \textit{istruzioneCompleta} che rappresenta l'intera stringa della regola.\\ \\
+\textbf{Tempo}: \(O(n\ \cdot\ k_{max})\), \(n\) numero di regole e \(k_{max}\) lunghezza massima della stringa \textit{istruzioneCompleta} tra tutte le regole\\
+\begin{itemize}
+  \item \(O(n)\), iterazione su \(n\) numero di regole
+  \item \(O(k_i)\), complessità di \textit{strings.SplitN} con \(k_i\) lunghezza della stringa completa della regola i-esima
+  \item \(O(1)\), per ogni regola passata a \textit{fmt.Printf}
+\end{itemize}
+\textbf{Spazio}: \(O(1)\), non alloco strutture dati aggiuntive (che crescerebbero con l'input)
+
+\subsection{blocco e bloccoOmog}\label{sec:block}
+Calcola la somma delle intensità delle piastrelle in un \textit{blocco omogeneo} o non omogeneo, utilizzando la \nameref{subsec:dfs} ed gestisce sia il caso di \textit{blocco} che di \textit{blocco omogeneo}.\\
+Viene preventivamente verificato che le coordinate passate corrispondano ad una \textit{piastrella accesa} e in caso affermativo si inizializza l'intensità ad valore della piastrella attuale.\\ \\
+\textbf{Tempo}: \(O(n\ +\ m)\), la \textit{DFS} \(O(n\ +\ m)\) con \(n\) numero di piastrelle nel blocco e  \(m\) numero di archi; accesso alla mappa e stampa in tempo costante \(O(1)\)\\
+\textbf{Spazio}: \(O(n)\) per la mappa delle \textit{visite} nel caso peggiore di \(n\) piastrelle
+
+\subsection{propaga}\label{sec:prop}
+Applica la prima regola valida a una piastrella specifica, se nessuna regola valida viene trovata (la funzione di utilità "\nameref{subsec:checkRule}" restituisce \textit{nil}) non fa niente, altrimenti viene effettuata la funzione "\nameref{subsec:color}" e viene incrementato il \textit{consumo} di tale \textit{regola}.\\ \\
+\textbf{Tempo}: \(O(R \cdot C)\) nel caso peggiore, dove \(R\) è il numero di regole e \(C\) è il numero di colori per regola
+\textbf{Spazio}: \(O(1)\), non vengono utilizzate strutture dati aggiuntive, ma quelle già esistenti (quindi una quantità di memoria costante)
+
+\subsection{propagaBlocco}\label{sec:propBlock}
+Propaga il colore su un blocco di piastrelle dove appartiene la piastrella di coordinate \((x,\ y)\) passate come parametro.\\
+Utilizzo la \nameref{subsec:dfs} (\(O(n\ +\ m)\)) per ottenere il \textit{blocco} di appartenenza della piastrella(x, y), itero sulle piastrelle del blocco (\(O(v)\)) e all'interno dell'iterazione, per ogni piastrella, verifico la validità della regola (\(O(r)\))\\ \\
+\textbf{Tempo}: \(O(n) + O(m \cdot r)\), \(n\) è il numero di piastrelle nel blocco, \(m\) è il numero di regole, e \(r\) è il numero di regole; essendo un piano, si può semplificare \(n \approx m\), perciò \(O(n\ +\ n \cdot r)\)\\
+\textbf{Spazio}: \(O(n)\) nel caso peggiore tutte le strutture dati di memorizzazione hanno \(O(n)\), sia per la mappa \textit{visite}, la \textit{DFS}, che lo \textit{stack di ricorsione}
+
+\subsection{ordina}
+Ordina le \textit{regole di propagazione} (specificate nella sezione "\nameref{subsec:rule}") per \textit{consumo}.\\
+Quando due regole hanno lo stesso \textit{consumo} mantengo il loro ordine precedente rispetto all'applicazione della funzione \textit{ordina}.\\ \\
+\textbf{Tempo}: \(O(n \log n)\), \(n\) numero di regole, dovuto all'algoritmo di ordinamento \href{https://pkg.go.dev/sort#SliceStable}{sliceStable} (si tratta di una versione modificata di \textit{mergeSort})\\
+\textbf{Spazio}: \(O(1)\), poiché l'ordinamento avviene in loco, sulla slice di regole da applicare, senza utilizzare spazio aggiuntivo oltre alla memoria già allocata per le \textit{regole} stesse
+
+\subsection{pista}
+Stampa la \textit{pista} (un cammino) seguendo una \textit{sequenza di direzioni} a partire da una piastrella (\(x,\ y\)), solo se tale pista è definita, altrimenti non stampa niente.\\
+Internamente chiama la funzione "\nameref{subsec:getPista}" (descritta nell'apposita sezione) che segue la \textit{sequenza di direzioni} e aggiorna la \textit{stringa da stampare} se trova le piastrelle.\\
+Se la stringa risultante è vuota, significa che nessuna pista è stata trovata e non viene stampato nulla, altrimenti viene stampata la sequenza delle piastrelle, con le relative informazioni come da specifica.\\
+\\
+\textbf{Tempo}: \(O(k)\), \(k\) lunghezza della \textit{sequenza di direzioni}, stesso costo per la funzione \textit{strings.Split} di \(k\) numero di direzioni e la funzione \nameref{subsec:getPista}\\
+\textbf{Spazio}: \(O(k)\), \(k\) lunghezza della \textit{sequenza di direzioni} (è richiesto lo spazio per la memorizzazione della stringa dipendente appunto da esse)
+
+\subsection{lung}
+Calcola la lunghezza della pista più breve tra due piastrelle usando la \textit{BFS} (\nameref{subsec:bfs}), in pratica, cerca il \textit{cammino minimo} tra due vertici e ne stampa la \textit{lunghezza} (se definito).\\
+La complessità spaziale e temporale quindi di questa funzione sono strettamente influenzate dalla funzione \textit{calcolaPistaBreve} (e quindi la BFS).\\
+\textbf{Tempo}: \(O(V\ +\ E)\), con \(V\) numero di piastrelle del piano da esplorare, \(E\) numero di archi (vertici in comune delle piastrelle), pari quindi alla \textit{BFS}\\
+\textbf{Spazio}: \(O(n)\) per le strutture dati di BFS, con \(n\) numero di vertici
+
+\section{Funzioni di utilità}
+In questa sezione sono presenti le \textit{funzioni} utili alle altre \nameref{sec:funcs} principali che permettono di evitare la ridondanza di codice e di raggruppare comportamenti condivisi richiesti.\\
+
+\subsection{calcolaDeltaVertice}
+Calcola e restituisce un \textit{punto} dati in input il \textit{punto di origine} e lo spostamento sulla coordinata \(x\) (\textit{deltaX int}) e \(y\) (\textit{deltaY int}).\\ \\
+\textbf{Tempo}: \(O(1)\), operazione aritmetica basilare in tempo costante \\
+\textbf{Spazio}: \(O(1)\), restituisce un \textit{punto} che come descritto precedentemente è una struttura composta da due interi (\(x,\ y\))
+
+\subsection{dfs}\label{subsec:dfs}
+La visita in profondità (\textit{DFS}) viene usata per le funzioni \nameref{sec:block} e \nameref{sec:propBlock} per ottenere le piastrelle di un blocco partendo da una piastrella indicata dal vertice (\textit{punto} di coordinate \(x,\ y\)).\\
+La ricerca procederà ricorsivamente se la \textit{piastrella} (vertice) attuale non è stata ancora visitata ed è \textit{accesa}.\\
+Ho definito questa funzione utilizzando ulteriori parametri per renderla versatile per ulteriori calcoli.\\
+Sono presenti infatti un \textit{booleano omogeneo}, una \textit{mappa blocco} ed un \textit{puntatore ad intero sum}.
+
+\begin{itemize}
+  \item \textbf{omogeneo} \textit{bool}: \textit{true} per calcolare appunto le piastrelle circonvicine nel caso di un \textit{blocco omogeneo}, \textit{false} altrimenti
+  \item \textbf{blocco} \textit{map[punto]*Piastrella}: conterrà un puntatore alla mappa (le mappe in Go sono passate per riferimento) nel caso di \textit{blocco omogeneo}, altrimenti sarà \textit{nil} e non verrà modificato
+  \item \textbf{sum} \textit{*int}: nel caso di \textit{blocco/blocco omogeneo}, conterrà l'indirizzo di un intero inizializzato nella funzione chiamante (\textit{blocco()}), questo per sommare il valore dell'intensità delle piastrelle in loco ed evitare di restituire valori; sarà \textit{nil} se non è richiesta la somma come nella funzione \nameref{sec:propBlock}
+\end{itemize}
+
+\textbf{Tempo}: \(O(n\ +\ m)\), \(n\) numero di piastrelle nel blocco, \(m\) numero di archi
+\begin{itemize}
+  \item \(O(1)\): aggiunta vertice alla mappa
+  \item \(O(1)\): per iterazione sulle direzioni possibili (8 nel caso del progetto)
+  \item \(O(1)\): \textit{calcolaDeltaVertice} come riportato in precedenza
+  \item \(O(1)\): verifica delle condizioni e ricorsione
+\end{itemize}
+\textbf{Spazio}: \(O(n)\) per la mappa delle visite, \(n\) numero di vertici visitati
+\begin{itemize}
+  \item \(O(n)\): memorizzazione del booleano per ogni piastrella (vertice)
+  \item \(O(n)\): caso peggiore, la mappa può richiedere \(O(n)\) piastrelle
+  \item \(O(n)\): stack della chiamata ricorsiva, pari al numero di piastrelle \(n\)
+  \item \(O(1)\): spazio della variabile \textit{sum} 
+\end{itemize}
+
+\subsection{piastrelleCirconvicine}
+Restituisce le piastrelle circonvicine (definite nella sezione "\nameref{sec:tiles}") come una mappa (\textit{map[punto]*Piastrella}), partendo da un vertice (\textit{punto}) di origine, seguendo le 8 direzioni possibili, e se viene passato anche il 3° parametro (\textit{co
+lori map[string]int}), cioè diverso da \textit{nil} aggiorna la mappa dei colori delle piastrelle circostanti.\\ \\
+\textbf{Tempo}: \(O(1)\), \textit{for-range} esegue 8 iterazioni (sono 8 le direzioni), mantenendo costante l'accesso alla mappa ed eventualmente aggiungendo un elemento a quest'ultima (in \(O(1)\)), e la stessa cosa avviene per la mappa colori se deve essere aggiornata\\
+\textbf{Spazio}: \(O(1)\), la mappa \textit{vicine} contiene al massimo 8 elementi, mentre quella \textit{colori} non richiede ulteriore spazio in quanto passata per riferimento
+
+\subsection{verificaRegola}\label{subsec:checkRule}
+Restituisce la \textit{prima regola} valida (applicabile) su una piastrella e ne aggiorna il \textit{consumo}, in caso nessuna regola può essere applicata non vengono effettuate altre operazioni.\\
+Nel dettaglio, verifico le piastrelle circonvicine e i loro colori e successivamente controllo se la regola che sto valutando può essere applicata, cioè se il valore dei colori dell'intorno è sufficiente al valore dei colori della regola.\\ \\
+\textbf{Tempo}: \(O(c)\), \(c\) pari al numero di colori distinti, che essendo limitato cresce in modo lineare rispetto al suo numero\\
+\begin{itemize}
+  \item \(O(1)\): creazione mappa \textit{valoriColore}
+  \item \(O(1)\): funzione \textit{piastrelleCirconvicine} come precedentemente indicato
+  \item \(O(c)\): ciclo di iterazione sui colori indicati dalla regola, numero massimo di colori pari a \(c\)
+\end{itemize}
+\textbf{Spazio}: \(O(1)\), la mappa \textit{valoriColore} contiene al massimo 8 colori (pari a tutte le piastrelle circonvicine di colore diverso) garantendo un tempo trascurabile e costante
+
+\subsection{calcolaPista}\label{subsec:getPista}
+Calcola la \textit{pista} (definita nella sezione "\nameref{sec:pista}"), seguendo la sequenza di direzioni passate come parametro ed aggiorna la \textit{stringa da stampare} (come richiesto da specifica) se tale pista è definita. Se la pista non esiste, non restituisce nulla e la stringa da stampare sarà vuota.\\
+Inizializzo la \textit{stringa} inserendo le coordinate (date dal \textit{punto}) della piastrella di origine e seguo la sequenza di direzioni, se trovo una \textit{piastrella spenta} (e quindi non esistente) mi fermo e resetto la stringa da stampare.\\ \\
+\textbf{Tempo}: \(O(n)\), \(n\) numero di direzioni specificate (sulle quali iterare)\\
+\begin{itemize}
+  \item \(O(n)\): iterazione sulle \(n\) direzioni
+  \item \(O(1)\): funzione \textit{calcolaDeltaVertice} come precedentemente indicato per ogni nuova piastrella in tempo costante
+\end{itemize}
+\textbf{Spazio}: \(O(n)\), dovuto alle variabili locali utilizzate per le piastrelle visitate e la stringa di output che verrà stampata; questo quindi è pari al numero \(n\) di piastrelle visitate durante il calcolo
+
+\subsection{calcolaPistaBreve}\label{subsec:bfs}
+Calcola la \textit{pista più breve} (definita nella sezione "\nameref{sec:pista}"), cioè il cammino minimo tra due vertici \((x_1,\ y_1)\) e \((x_2,\ y_2)\) dati e ne restituisce la \textit{lunghezza}.\\
+Viene utilizzata, come indicato nella sezione "\nameref{sec:pista}", una ricerca in ampiezza (\textit{BFS}) trattando il problema come grafo non pesato.\\
+La funzione \textit{calcolaPistaBreve}, compresa la \textit{BFS} è stata implementata seguendo questi passaggi:\\
+\begin{itemize}
+  \item \(O(1)\): verifica che la piastrella di \textit{origine} e \textit{arrivo} siano \textit{accese} altrimenti si ferma la computazione
+  \item \(O(1)\): inizializzazione della \textit{mappa visitate} e \textit{coda per i vertici}
+  \item \(O(1)\): segno nella mappa la piastrella di origine come visitata
+  \item \(O(V\ +\ E)\): fin quando la \textit{coda} non è \textit{vuota}, algoritmo \textit{BFS} (\(V\) vertici, \(E\) archi)
+  \begin{itemize}
+    \item estraggo il primo vertice della coda
+    \item se il vertice estratto è quello di arrivo, fermo la computazione e restituisco la \textit{lunghezza}
+    \item ottengo le piastrelle circonvicine al vertice corrente
+    \item per ogni piastrella adiacente, non ancora visitata, la aggiungo alla coda e segno come visitata
+    \item incremento alla fine la \textit{lunghezza}
+    \item se la coda è vuota e non ho trovato il vertice, non esiste una pista e la lunghezza è \(0\) come da specifica
+  \end{itemize}
+\end{itemize}
+
+\textbf{Tempo}: \(O(V\ +\ E)\), con \(V\) numero di piastrelle del piano da esplorare, \(E\) numero di archi (vertici in comune delle piastrelle)\\
+\begin{itemize}
+  \item \(O(1)\): Inizializzo le strutture dati e inserisco la \textit{piastrella d'origine} nella coda
+  \item \(O(1)\): verifico che la piastrella attuale sia quella di \textit{arrivo} ed in quel caso 
+  \item \(O(V\ +\ E)\): ciclo della \textit{BFS}, quindi per ogni \textit{piastrella circonvicina}
+\end{itemize}
+La complessità temporale di questa funzione è influenzata quindi dalla \textbf{BFS}.\\
+\textbf{Spazio}: \(O(V)\), vertici \(V\) memorizzati (piastrelle) nelle mappe, proporzionalmente al loro numero; le variabili locali utilizzate hanno un costo di spazio pari a \(O(1)\)\\
+\begin{itemize}
+  \item \(O(V)\): la \textit{coda} contiene al massimo \(V\) vertici
+  \item \(O(V)\): la mappa \textit{visitate} tiene traccia di \(V\) vertici visitati (piastrelle)
+\end{itemize}
+
+\section{Requisiti e Testing}
+Per testare ed utilizzare il programma contenuto all'interno di questo archivio sono sufficienti una versione di \textbf{go} recente presente nel \textit{\$PATH} ed una \textit{shell} dove eseguire alcuni semplici comandi.
+Se questi requisiti sono soddisfatti, dopo essersi posizionati nella cartella principale (978578\_manca\_kevin) basta eseguire il comando \textit{go build} che assembla il codice sorgente presente nel \textit{file go} che contiene la funzione \textit{main}, generando un eseguibile, e successivamente eseguire \textit{go test} che eseguirà tutte le funzioni presenti nel file \textbf{*\_test.go}.\\
+Un altro possibile metodo è quello di utilizzare l'eseguibile generato dal comando \textit{go build} e reindirizzarli dei file di input o usare il pipe per ottenere il risultato.
+Ecco alcuni esempi con i \textit{placeholder} da sostituire
+
+\begin{lstlisting}[language=bash, caption=Esempio comandi shell, label=shellcode, basicstyle=\small]
+cd "978578_manca_kevin"
+go build
+# Utilizzando il file eseguibile (passando delle stringhe separate da '\n')
+echo "STRINGA_COMANDO" | ./978578_manca_kevin
+# Utilizzando il file eseguibile e reindirizzando l'input dei file da testare
+./978578_manca_kevin < FILE_INPUT
+# oppure
+echo "STRINGA_COMANDO" | go run ./978578_manca_kevin.go
+\end{lstlisting}
+
+\subsection{Test}
+Come indicato nella sezione "\nameref{sec:intro}", sono presenti all'interno della cartella \texttt{test/} ulteriori cartelle con i file di \textit{input} e quelli di \textit{output} che ci si aspetta (expected).\\
+Tali file mostrano il comportamento del programma relativo a particolarità della specifica, e ciascuno ha il formato \texttt{BaseNomeFunzioni}.\\
+Ecco alcuni esempi:\\
+
+\begin{itemize}
+  \item  Esempio input \textit{blocco} e \textit{blocco omogeneo} e il loro output\\
+  \begin{minipage}[t]{0.45\textwidth}
+  \begin{verbatim}
+  C 1 1 rosso 2
+  C 1 2 rosso 2
+  C 1 0 verde 5
+  b 1 1
+  B 1 1
+  B 1 0
+  q
+  \end{verbatim}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.45\textwidth}
+  \begin{itemize}
+  \begin{verbatim}
+  9
+  4
+  4
+  \end{verbatim}
+  \end{itemize}
+  \end{minipage}
+  Questo esempio mostra come il calcolo di \textit{blocco} e \textit{blocco omogeneo} applicato nella stessa piastrella(\(1,\ 1\)) restituisce nel primo caso l'intensità pari a quella totale delle piastrelle inizializzate è pari a \(2+2+5 = 9\), mentre nel secondo caso \(2+2 = 4\) in quanto la piastrella (\(1,\ 0\)) non ha lo stesso colore della piastrella sulla quale viene chiamato il blocco.\\
+
+  \item  Esempio input \textit{propaga} e \textit{propagaBlocco} e il loro output\\
+  \begin{minipage}[t]{0.45\textwidth}
+  \begin{verbatim}
+  C 2 2 g 3
+  C 2 3 g 2
+  C 2 1 r 5
+  r v 1 g 1 r
+  r m 2 g
+  p 2 2
+  p 2 3
+  P 2 1
+  s
+  \end{verbatim}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.45\textwidth}
+  \begin{itemize}
+  \begin{verbatim}
+  (
+  v: 1 g 1 r
+  m: 2 g
+  )
+  \end{verbatim}
+  \end{itemize}
+  \end{minipage}
+  Con le piastrelle di coordinate (\(2,\ 2\)), (\(2,\ 3\)), (\(2,\ 0\)), e le regole definite questo esempio mostra come la propagazione del colore tramite \textit{propaga} e \textit{propagaBlocco}.\\ 
+  La propagazione sulla piastrella (\(2,\ 2\)) comporta che la prima regola venga applicata (\textit{r v 1 g 1 r}) ricolorando la piastrella di \texttt{v}.\\
+  La propagazione sulla piastrella (\(2,\ 1\)) comporta che la seconda regola venga applicata (\textit{r e 2 g}) ricolorando la piastrella di \texttt{m}.\\
+  Effettuando infine \textit{propagaBlocco} sulla piastrella (\(2,\ 1\)) le piastrelle risultano:\\
+  \begin{itemize}
+    \item Piastrella(2, 2): v 3
+    \item Piastrella(2, 3): g 2
+    \item Piastrella(2, 1): r 5
+  \end{itemize}
+  \\
+  \item  Esempio input \textit{pista} e \textit{lung} e il loro output\\
+  \begin{minipage}[t]{0.45\textwidth}
+  \begin{verbatim}
+  C 3 0 r 8
+  C 2 1 h 4
+  C 2 2 i 8
+  t 3 0 NO,NN
+  L 3 0 2 1
+  q
+  \end{verbatim}
+  \end{minipage}
+  \hfill
+  \begin{minipage}[t]{0.45\textwidth}
+  \begin{itemize}
+  \begin{verbatim}
+  [
+  3 0 r 8
+  2 1 h 4
+  2 2 i 8
+  ]
+  2
+  \end{verbatim}
+  \end{itemize}
+  \end{minipage}
+  Con le piastrelle di coordinate (\(3,\ 0\)), (\(2,\ 1\)), (\(2,\ 2\)), viene mostrato nell'esempio la \textit{pista} risultante e la sua \textit{lunghezza}.\\ 
+  La \textit{pista}, seguendo le \textit{direzioni NO,NN} partendo dalla piastrella(\(3,\ 0\)) risulta appunto \((3,\ 0) \rightarrow\ (2,\ 1)\ \rightarrow\ (2,\ 2)\).\\
+  Mentre la \textit{lunghezza} partendo dalla piastrella(\(3,\ 0\)) e arrivando alla piastrella(\((2,\ 1\)) risulta pari a \(2\).
+
+\end{itemize}
   
 \end{document}
 

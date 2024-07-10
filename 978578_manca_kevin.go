@@ -49,7 +49,7 @@ type punto struct {
 type Regola struct {
 	istruzioneCompleta string         // stringa della regola completa
 	colore             string         // nuovo colore della regola
-	consumo            uint           // numero tot di piastrelle a cui è stata applicata la regola
+	consumo            int            // numero tot di piastrelle a cui è stata applicata la regola
 	valColore          map[string]int // mappa il colore col relativo valore
 }
 
@@ -111,8 +111,8 @@ func esegui(p piano, s string) {
 	switch flags[0] {
 	case "C": // Blocco Omogeneo
 		alpha := flags[3]
-		intensity, _ := strconv.Atoi(flags[4])
-		colora(p, x, y, alpha, intensity)
+		intensità, _ := strconv.Atoi(flags[4])
+		colora(p, x, y, alpha, intensità)
 
 	case "r": // Regola
 		// Le regole hanno questa forma: r x 1 a
@@ -130,10 +130,10 @@ func esegui(p piano, s string) {
 		stampa(p)
 
 	case "B": // Blocco Omogeneo
-		blocco(p, x, y, true, true)
+		blocco(p, x, y, true)
 
 	case "b": // Blocco
-		blocco(p, x, y, false, true)
+		blocco(p, x, y, false)
 
 	case "p": // Propaga
 		propaga(p, x, y)
@@ -164,13 +164,13 @@ func esegui(p piano, s string) {
 
 // Colora Piastrella(x, y) di colore α,
 // qualunque sia lo stato di Piastrella(x, y) prima dell’operazione.
-func colora(p piano, x int, y int, alpha string, intensità int) {
+func colora(p piano, x int, y int, alpha string, i int) {
 	coordinate := punto{x, y}
 	if piastrella, ok := p.piastrelle[coordinate]; ok && piastrella.intensità == 0 {
-		piastrella.intensità = intensità
+		piastrella.intensità = i
 		piastrella.colore = alpha
 	} else {
-		p.piastrelle[coordinate] = &Piastrella{x: coordinate.x, y: coordinate.y, colore: alpha, intensità: intensità}
+		p.piastrelle[coordinate] = &Piastrella{x: coordinate.x, y: coordinate.y, colore: alpha, intensità: i}
 	}
 }
 
@@ -200,12 +200,14 @@ func regola(p piano, r string) {
 
 // Stampa e restituisce il colore e l’intensità di Piastrella(x, y).
 // Se Piastrella(x, y) è spenta, non stampa nulla.
-func stato(p piano, x int, y int) {
+func stato(p piano, x int, y int) (string, int) {
 	P := punto{x, y}
 
 	if piastrella, ok := p.piastrelle[P]; ok && piastrella.intensità > 0 {
 		fmt.Printf("%s %d\n", piastrella.colore, piastrella.intensità)
+		return piastrella.colore, piastrella.intensità
 	}
+	return "", 0
 }
 
 // Stampa l’elenco delle regole di propagazione, nell’ordine attuale.
@@ -224,7 +226,7 @@ func stampa(p piano) {
 // blocco (omogeneo o non in base alla variabile omonima passata come parametro)
 // di appartenenza di Piastrella(x, y).
 // Se Piastrella(x, y) è spenta, restituisce 0.
-func blocco(p piano, x int, y int, omogeneo bool, stampaRisultato bool) (circonvicine map[punto]bool) {
+func blocco(p piano, x int, y int, omogeneo bool) {
 	vertice := punto{x, y}
 	risultatoSomma := 0
 
@@ -245,10 +247,7 @@ func blocco(p piano, x int, y int, omogeneo bool, stampaRisultato bool) (circonv
 		dfs(p, vertice, visite, nil, false, &risultatoSomma)
 	}
 
-	if stampaRisultato {
-		fmt.Println(risultatoSomma)
-	}
-	return visite
+	fmt.Println(risultatoSomma)
 }
 
 // Applica a Piastrella(x, y) la prima regola di propagazione applicabile
@@ -275,7 +274,7 @@ func propagaBlocco(p piano, x int, y int) {
 
 	_, ok := p.piastrelle[vertice]
 	if !ok {
-		return // Se la piastrella è spenta, non proseguo
+		return // Se la piastrella è spenta/non esiste, non proseguo
 	}
 
 	visite := make(map[punto]bool)
@@ -336,16 +335,15 @@ func lung(p piano, x1 int, y1 int, x2 int, y2 int) {
 	verticeOrig := punto{x1, y1}
 	verticeDest := punto{x2, y2}
 
-	pistaBreve := make(map[punto]*Piastrella)
-	lunghezza := calcolaPistaBreve(p, verticeOrig, verticeDest, pistaBreve)
+	lunghezza := calcolaPistaBreve(p, verticeOrig, verticeDest)
 
-	if len(pistaBreve) > 0 && lunghezza > 0 {
+	if lunghezza > 0 {
 		fmt.Println(lunghezza)
 	}
 }
 
 //
-/******************************** HELPER FUNCTIONS **************************************/
+/******************************** UTILITY FUNCTIONS **************************************/
 //
 
 // Funzione creata per effettuare un wrap di un operazione usata
@@ -390,7 +388,7 @@ func dfs(
 
 // Funzione che calcola le piastrelle circonvicine alla Piastrella(x, y)
 // Restituisce la mappa `vicine`
-func piastrelleCirconvicine(p piano, vertice punto) (vicine map[punto]*Piastrella) {
+func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vicine map[punto]*Piastrella) {
 	vicine = make(map[punto]*Piastrella)
 
 	for _, direzione := range direzioni {
@@ -398,28 +396,19 @@ func piastrelleCirconvicine(p piano, vertice punto) (vicine map[punto]*Piastrell
 
 		if piastrella, ok := p.piastrelle[nuovoVertice]; ok {
 			vicine[nuovoVertice] = piastrella
+			if colori != nil {
+				colori[piastrella.colore]++
+			}
 		}
 	}
 	return vicine
 }
 
-// Calcola e mappa il numero di colori dell'intorno
-func calcolaColoriCirconvicine(p piano, vertice punto) map[string]int {
-	colori := make(map[string]int)
-	circonvicine := piastrelleCirconvicine(p, vertice)
-
-	// Per tutte le piastrelle circonvicine aggiorno la mappa dei colori, per conoscere
-	// il valore dei colori dell'intorno
-	for _, piastrella := range circonvicine {
-		colori[piastrella.colore]++
-	}
-	return colori
-}
-
 // Verifica che una regola sia applicabile in base ai colori circostanti
 // return: nil se nessuna regola è valida, altrimenti un puntatore alla regola
 func verificaRegola(p piano, regola *Regola, vertice punto, intensità *int) *Regola {
-	valoriColore := calcolaColoriCirconvicine(p, vertice)
+	valoriColore := make(map[string]int)
+	piastrelleCirconvicine(p, vertice, valoriColore)
 
 	// Verifico che l'insieme dei valori dei colori della regola sia minore
 	// del valore delle piastrelle circonvicine, altrimenti non posso applicare la regola
@@ -460,7 +449,6 @@ func calcolaPista(p piano, vertice punto, seqDirezioni []string, pistaDaStampare
 			*pistaDaStampare += fmt.Sprintf("\n%d %d %s %d",
 				altraPiastrella.x, altraPiastrella.y,
 				altraPiastrella.colore, altraPiastrella.intensità)
-
 		} else {
 			*pistaDaStampare = ""
 			return
@@ -470,19 +458,20 @@ func calcolaPista(p piano, vertice punto, seqDirezioni []string, pistaDaStampare
 
 // Calcola la pista più breve, utilizza una `BFS` che aggiorna la mappa `pistaBreve`
 // return: la lunghezza della pista più breve, 0 altrimenti
-func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto, pistaBreve map[punto]*Piastrella) int {
+func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) (lunghezza int) {
 	piastrellaOrig, origineOk := p.piastrelle[verticeOrig]
 	piastrellaDest, destOk := p.piastrelle[verticeDest]
 
 	// Se le piastrelle di origine e destinazione non sono accese oppure non sono valide,
 	//  non posso calcolare la pista
 	if (!origineOk || piastrellaOrig.intensità == 0) || (!destOk || piastrellaDest.intensità == 0) {
-		return 0
+		lunghezza = 0
+	} else {
+		lunghezza = 1
 	}
 
 	// Inizializzazione
 	visitate := make(map[punto]bool)
-	precedenti := make(map[punto]punto)
 	queue := []punto{verticeOrig}
 	// Aggiungo il primo vertice di origine alla mappa delle visite
 	visitate[verticeOrig] = true
@@ -492,25 +481,19 @@ func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto, pistaBreve
 		vertice := queue[0]
 		queue = queue[1:]
 
-		if vertice == verticeDest {
-			// Ricostruisco il percorso più breve
-			for v := vertice; v != verticeOrig; v = precedenti[v] {
-				pistaBreve[v] = p.piastrelle[v]
-			}
-			pistaBreve[verticeOrig] = piastrellaOrig // Aggiungo la piastrella d'origine
-
-			return len(pistaBreve)
+		if vertice == verticeDest { // se il vertice attuale è quello di arrivo, mi fermo
+			return lunghezza
 		}
 
-		adiacenti := piastrelleCirconvicine(p, vertice)
+		adiacenti := piastrelleCirconvicine(p, vertice, nil)
 		for _, piastrella := range adiacenti {
 			coordinatePiastrella := punto{piastrella.x, piastrella.y}
 			if !visitate[coordinatePiastrella] {
-				queue = append(queue, coordinatePiastrella)
-				visitate[coordinatePiastrella] = true
-				precedenti[coordinatePiastrella] = vertice
+				queue = append(queue, coordinatePiastrella) // aggiorno la coda
+				visitate[coordinatePiastrella] = true       // segno la piastrella attuale come visitata
 			}
 		}
+		lunghezza++
 	}
 	return 0
 }

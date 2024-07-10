@@ -1,0 +1,7 @@
+C 2 2 g 3
+C 2 3 g 2
+C 2 1 r 5
+r v 1 g 1 r
+r m 2 g
+P 2 1
+s
