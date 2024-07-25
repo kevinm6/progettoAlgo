@@ -136,6 +136,7 @@ func esegui(p piano, s string) {
 		blocco(p, x, y, false)
 
 	case "p": // Propaga
+		fmt.Println("call propaga")
 		propaga(p, x, y)
 
 	case "P": // Propaga Blocco
@@ -178,7 +179,9 @@ func colora(p piano, x int, y int, alpha string, i int) {
 // Se Piastrella(x, y) è già spenta, non fa nulla.
 func spegni(p piano, x int, y int) {
 	P := punto{x, y}
-	if tile := p.piastrelle[P]; tile.intensità > 0 {
+	// FIX mancava il bool per verificare che la piastrella esistesse
+	//		perciò un input tipo `S 9 9` mandava in crash il programma per un puntatore non valido
+	if tile, ok := p.piastrelle[P]; ok && tile.intensità > 0 {
 		tile.intensità = 0
 	}
 }
@@ -292,8 +295,10 @@ func propagaBlocco(p piano, x int, y int) {
 			intensità := 1
 			for _, regolaDaValidare := range p.regole {
 				if regolaValida := verificaRegola(p, regolaDaValidare, coordinate, &intensità); regolaValida != nil {
+					fmt.Println(regolaValida)
 					colora(p, coordinate.x, coordinate.y, regolaValida.colore, p.piastrelle[vertice].intensità)
 					regolaValida.consumo++
+					return
 				}
 			}
 		}
@@ -310,7 +315,9 @@ func ordina(p piano) {
 	sort.SliceStable(p.regole, func(i, j int) bool {
 		consumoI := p.regole[i].consumo
 		consumoJ := p.regole[j].consumo
-		return (consumoI == consumoJ) && i < j || consumoI < consumoJ
+		// fmt.Println("i =>", p.regole[i].istruzioneCompleta, " (", consumoI, ")")
+		// fmt.Println("j =>", p.regole[j].istruzioneCompleta, " (", consumoJ, ")")
+		return (consumoI < consumoJ) // && i < j || consumoI < consumoJ
 	})
 }
 
@@ -391,11 +398,20 @@ func dfs(
 func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vicine map[punto]*Piastrella) {
 	vicine = make(map[punto]*Piastrella)
 
+	// dirc := []punto{
+	// 	{vertice.x - 1, vertice.y},
+	// 	{vertice.x + 1, vertice.y},
+	// 	{vertice.x, vertice.y - 1},
+	// 	{vertice.x, vertice.y + 1},
+	// 	{vertice.x - 1, vertice.y - 1},
+	// 	{vertice.x + 1, vertice.y - 1},
+	// 	{vertice.x - 1, vertice.y + 1},
+	// 	{vertice.x + 1, vertice.y + 1}}
 	for _, direzione := range direzioni {
 		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
 
 		if piastrella, ok := p.piastrelle[nuovoVertice]; ok {
-			vicine[nuovoVertice] = piastrella
+			vicine[punto{piastrella.x, piastrella.y}] = piastrella
 			if colori != nil {
 				colori[piastrella.colore]++
 			}
@@ -407,6 +423,7 @@ func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vici
 // Verifica che una regola sia applicabile in base ai colori circostanti
 // return: nil se nessuna regola è valida, altrimenti un puntatore alla regola
 func verificaRegola(p piano, regola *Regola, vertice punto, intensità *int) *Regola {
+	fmt.Println(" stampa regola: ", regola)
 	valoriColore := make(map[string]int)
 	piastrelleCirconvicine(p, vertice, valoriColore)
 
@@ -458,32 +475,28 @@ func calcolaPista(p piano, vertice punto, seqDirezioni []string, pistaDaStampare
 
 // Calcola la pista più breve, utilizza una `BFS` che aggiorna la mappa `pistaBreve`
 // return: la lunghezza della pista più breve, 0 altrimenti
-func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) (lunghezza int) {
+func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) int {
 	piastrellaOrig, origineOk := p.piastrelle[verticeOrig]
 	piastrellaDest, destOk := p.piastrelle[verticeDest]
 
 	// Se le piastrelle di origine e destinazione non sono accese oppure non sono valide,
 	//  non posso calcolare la pista
 	if (!origineOk || piastrellaOrig.intensità == 0) || (!destOk || piastrellaDest.intensità == 0) {
-		lunghezza = 0
-	} else {
-		lunghezza = 1
+		return 0
 	}
 
 	// Inizializzazione
 	visitate := make(map[punto]bool)
 	queue := []punto{verticeOrig}
+	lunghezza := make(map[punto]int)
 	// Aggiungo il primo vertice di origine alla mappa delle visite
 	visitate[verticeOrig] = true
+	lunghezza[verticeOrig] = 1
 
 	// BFS
 	for len(queue) > 0 {
 		vertice := queue[0]
 		queue = queue[1:]
-
-		if vertice == verticeDest { // se il vertice attuale è quello di arrivo, mi fermo
-			return lunghezza
-		}
 
 		adiacenti := piastrelleCirconvicine(p, vertice, nil)
 		for _, piastrella := range adiacenti {
@@ -491,9 +504,19 @@ func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) (lunghezza
 			if !visitate[coordinatePiastrella] {
 				queue = append(queue, coordinatePiastrella) // aggiorno la coda
 				visitate[coordinatePiastrella] = true       // segno la piastrella attuale come visitata
+				// aggiorno la lunghezza -> lunghezza dal vertice nella coda +1
+				// A - B - C
+				// lunghezza[A] = 0
+				// lunghezza[B] = lunghezza[A] + 1
+				// lunghezza[C] = lunghezza[B] + 1
+				lunghezza[coordinatePiastrella] = lunghezza[vertice] + 1
+
+				if coordinatePiastrella == verticeDest { // se il vertice attuale è quello di arrivo, mi fermo
+					return lunghezza[coordinatePiastrella]
+				}
 			}
+
 		}
-		lunghezza++
 	}
 	return 0
 }

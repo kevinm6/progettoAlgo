@@ -152,6 +152,16 @@ func TestBaseBloccoOrdina(t *testing.T) {
 	)
 }
 
+func TestBaseSpegniPiastrellaOff(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/BaseSpegniPiastrellaOff",
+		"./test/expected/BaseSpegniPiastrellaOff",
+		verbose,
+	)
+}
+
 func TestBaseSpegni(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
