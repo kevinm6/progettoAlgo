@@ -102,6 +102,16 @@ func TestBasePropaga(t *testing.T) {
 	)
 }
 
+func TestBasePropagaBloccoProf(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/BasePropagaBloccoProf",
+		"./test/expected/BasePropagaBloccoProf",
+		verbose,
+	)
+}
+
 func TestBasePropaga2(t *testing.T) {
 	LanciaGenericaConFileInOutAtteso(
 		t,
@@ -178,6 +188,56 @@ func TestBaseSpegni2(t *testing.T) {
 		prog,
 		"./test/input/BaseSpegni2",
 		"./test/expected/BaseSpegni2",
+		verbose,
+	)
+}
+
+func TestInputVario1(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/InputVario1",
+		"./test/expected/ExpectedVario1",
+		verbose,
+	)
+}
+
+func TestInputVario2(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/InputVario2",
+		"./test/expected/ExpectedVario2",
+		verbose,
+	)
+}
+
+func TestInputVario3(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/InputVario3",
+		"./test/expected/ExpectedVario3",
+		verbose,
+	)
+}
+
+func TestInputVario4(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/InputVario4",
+		"./test/expected/ExpectedVario4",
+		verbose,
+	)
+}
+
+func TestInputVario5(t *testing.T) {
+	LanciaGenericaConFileInOutAtteso(
+		t,
+		prog,
+		"./test/input/InputVario5",
+		"./test/expected/ExpectedVario5",
 		verbose,
 	)
 }

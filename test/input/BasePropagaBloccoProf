@@ -1,0 +1,12 @@
+C 5 2 arancione 1
+C 5 3 blu 1
+C 5 4 rosso 1
+C 6 3 rosso 1
+r blu 2 arancione
+r giallo 1 rosso 1 blu
+r arancione 1 arancione 1 giallo
+r verde 1 rosso
+? 5 4 
+P 5 4
+? 5 4
+q

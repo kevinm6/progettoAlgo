@@ -261,6 +261,9 @@ func propaga(p piano, x int, y int) {
 
 	intensità := 1
 
+	/* TODO
+	Ha davvero senso che mi ricalcolo ogni volta tutti i colori intorno piuttosto che farlo un unica volta? NO
+	*/
 	for _, regolaDaValidare := range p.regole {
 		// Applico solo la prima regolaValida valida e incremento il suo consumo
 		if regolaValida := verificaRegola(p, regolaDaValidare, vertice, &intensità); regolaValida != nil {
@@ -279,6 +282,11 @@ func propagaBlocco(p piano, x int, y int) {
 	if !ok {
 		return // Se la piastrella è spenta/non esiste, non proseguo
 	}
+
+	/* FIX
+	DA EVITARE che si rifaccia il controllo del blocco dopo che si è applicata una regola, ma è da fare
+	sul piano orgiginale prima che la regola sia stata applicata (altrimenti LOGICAMENTE CAMBIA)
+	*/
 
 	visite := make(map[punto]bool)
 	blocco := make(map[punto]*Piastrella)
@@ -396,6 +404,9 @@ func dfs(
 // Funzione che calcola le piastrelle circonvicine alla Piastrella(x, y)
 // Restituisce la mappa `vicine`
 func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vicine map[punto]*Piastrella) {
+	// TODO controllare se è più conveniente limitare le funzioni di questa e non
+	// restituire un valore in base alla funzione ma magari splittarla in un
+	// altra funzione e usare questa solo per la BFS
 	vicine = make(map[punto]*Piastrella)
 
 	// dirc := []punto{
@@ -493,6 +504,16 @@ func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) int {
 	visitate[verticeOrig] = true
 	lunghezza[verticeOrig] = 1
 
+	/* TODO
+		 * Documentare le modifiche fatte
+		 * lunghezza ora è una mappa perché devo tenere conto del vertice precedente
+		 *	A - B - C
+		 *	lunghezza[A] = 0
+		 *	lunghezza[B] = lunghezza[A] + 1
+		 *	lunghezza[C] = lunghezza[B] + 1
+	   *  NOTE : prima aggiornavo solo un intero generico
+	*/
+
 	// BFS
 	for len(queue) > 0 {
 		vertice := queue[0]
@@ -505,10 +526,6 @@ func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) int {
 				queue = append(queue, coordinatePiastrella) // aggiorno la coda
 				visitate[coordinatePiastrella] = true       // segno la piastrella attuale come visitata
 				// aggiorno la lunghezza -> lunghezza dal vertice nella coda +1
-				// A - B - C
-				// lunghezza[A] = 0
-				// lunghezza[B] = lunghezza[A] + 1
-				// lunghezza[C] = lunghezza[B] + 1
 				lunghezza[coordinatePiastrella] = lunghezza[vertice] + 1
 
 				if coordinatePiastrella == verticeDest { // se il vertice attuale è quello di arrivo, mi fermo
