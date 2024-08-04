@@ -1,0 +1,448 @@
+\documentclass{article}
+
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[a4paper,margin=3.5cm]{geometry}
+\usepackage{hyperref}
+\hypersetup{%
+  colorlinks=true,% hyperlinks will be coloured
+  linkcolor=black,% hyperlink text will be green
+  linkbordercolor=red,% hyperlink border will be red
+}
+
+\title{Note Aggiuntive\\ (Relazione Progetto Algoritmi)}
+\author{Kevin Manca, matricola 978578}
+\date{Revisione 05 Agosto 2024}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\section{Introduzione}\label{sec:intro}
+Note relative alla relazione e al progetto "Piastrelle Digitali", contenente le modifiche e revisioni fatte sul codice sorgente per risolvere problemi e discrepanze emerse durante la discussione in data 25 Luglio 2024.
+\\
+Insieme a queste note, e alla relazione aggiornata, ho allegato un file contenente i "\textit{diff}" rispetto al codice sorgente consegnato in data 10 Luglio 2024.
+
+\section{Funzioni modificate}\label{sec:funcs}
+In questa sezione sono presenti solo le funzioni che sono state modificate, con i cambiamenti effettuati ed eventuali argomentazioni relative ad essi.
+
+\subsection{spegni}
+Nella funzione \texttt{spegni} originale non era presente un controllo del \textit{booleano} che comportava un crash del programma se questo veniva lanciato, passando ad esempio un input contenente una piastrella non esistente.
+\\ \\
+Versione originale
+\begin{verbatim}
+func spegni(p piano, x int, y int) {
+	P := punto{x, y}
+	if tile, ok := p.piastrelle[P]; tile.intensità > 0 {
+		tile.intensità = 0
+	}
+}
+\end{verbatim}
+Versione originale
+\begin{verbatim}
+func spegni(p piano, x int, y int) {
+	P := punto{x, y}
+	if tile, ok := p.piastrelle[P]; ok && tile.intensità > 0 {
+		tile.intensità = 0
+	}
+}
+\end{verbatim}
+
+\subsection{propaga}
+La funzione \textit{propaga} sfrutta la funzione \nameref{subsec:calcolaColoriIntorno} per memorizzare i colori dell'intorno prima di applicare qualsiasi \textit{regola di propagazione} nella mappa \textit{coloriIntorno}.
+\\
+Viene passata poi questa mappa alla funzione \nameref{subsec:checkRule} che, come indicato nell'apposita sezione, restituisce la regola in esame se può essere soddisfatta dai colori dell'intorno, altrimenti restituirà \texttt{nil}.\\
+Se una regola è stata restituita, quindi è valida, verifico che la piastrella nel \textit{vertice} da cui effettuare la propagazione esista già e che sia accesa (intensità \(> 0\)), ed in quel caso ottengo la sua intensità per utilizzarla come valore per la funzione \textit{colora()}, altrimenti sarà impostata ad \(1\) come predefinita (come da specifica).\\
+Questa verifica è risultata necessaria in quanto non facendola, come in precedenza, l'intensità veniva impostata sul valore di una piastrella che magari esisteva già ma era stata spenta, il che portava a propagare il colore su più piastrelle ma con intensità a \(0\) (prendendo come intensità quella della piastrella spenta).
+\\ \\
+Versione originale
+\begin{verbatim}
+func propaga(p piano, x int, y int) {
+	vertice := punto{x, y}
+
+	intensità := 1
+
+	for _, regolaDaValidare := range p.regole {
+		if regolaValida := verificaRegola(p, regolaDaValidare, vertice, &intensità); regolaValida != nil {
+			colora(p, x, y, regolaValida.colore, intensità)
+			regolaValida.consumo++
+			break
+		}
+	}
+} 
+\end{verbatim}
+
+Versione modificata
+\begin{verbatim}
+ func propaga(p piano, x int, y int) {
+	vertice := punto{x, y}
+
+	coloriIntorno := calcolaColoriIntorno(p, vertice)
+
+	for _, regolaDaValidare := range p.regole {
+		if regolaValida := verificaRegola(regolaDaValidare, coloriIntorno); regolaValida != nil {
+			intensità := 1
+			if piastrella, esiste := p.piastrelle[vertice]; esiste && piastrella.intensità > 0 {
+				intensità = piastrella.intensità
+			}
+			colora(p, x, y, regolaValida.colore, intensità)
+			regolaValida.consumo++
+			break
+		}
+	}
+} 
+\end{verbatim}
+
+\subsection{propagaBlocco}
+Come la funzione \textit{propaga}, anche la funzione \texttt{propagaBlocco} sfrutta la funzione \nameref{subsec:calcolaColoriIntorno} per memorizzare i colori dell'intorno prima di applicare qualsiasi \textit{regola di propagazione} nella mappa \textit{coloriIntorno}.\\
+Nella versione originale di questa funzione erano presenti alcuni errori, nel dettaglio: non era presente un \textit{break} per interrompere l'applicazione della prima regola trovata per ciascuna \textit{piastrella} appartenente al \textit{blocco}; non utilizzo la funzione \texttt{colora()} in quanto la \textit{propagaBlocco} cambia eventualmente solo il colore delle piastrelle.\\
+Per questo motivo, utilizzo una mappa \texttt{coloriBloccoDaModificare} (\textit{map[punto]string}) dove memorizzo le coordinate della piastrella da modificare  con la stringa del nuovo colore, sulla quale itero successivamente, assegnando il nuovo colore a quello della piastrella presente nel relativo vertice.\\
+Non è presente, inoltre, il controllo sulla lunghezza in quanto risulta superfluo visto l'utilizzo del \textit{for-range}.
+\\ \\
+Versione originale
+\begin{verbatim}
+func propagaBlocco(p piano, x int, y int) {
+	vertice := punto{x, y}
+
+	_, ok := p.piastrelle[vertice]
+	if !ok {
+		return
+	}
+
+	visite := make(map[punto]bool)
+	blocco := make(map[punto]*Piastrella)
+	dfs(p, vertice, visite, blocco, false, nil)
+
+	if len(blocco) > 0 {
+		for vertice, piastrella := range blocco {
+			if piastrella == nil {
+				break
+			}
+
+			coordinate := punto{vertice.x, vertice.y}
+			intensità := 1
+			for _, regolaDaValidare := range p.regole {
+				if regolaValida := verificaRegola(p, regolaDaValidare, coordinate, &intensità); regolaValida != nil {
+					colora(p, coordinate.x, coordinate.y, regolaValida.colore, p.piastrelle[vertice].intensità)
+					regolaValida.consumo++
+				}
+			}
+		}
+	}
+}  
+\end{verbatim}
+
+Versione modificata
+\begin{verbatim}
+func propagaBlocco(p piano, x int, y int) {
+	vertice := punto{x, y}
+
+	_, ok := p.piastrelle[vertice]
+	if !ok {
+		return
+	}
+
+	visite := make(map[punto]bool)
+	blocco := make(map[punto]*Piastrella)
+	dfs(p, vertice, visite, blocco, false, nil)
+
+	coloriBloccoDaModificare := make(map[punto]string)
+
+	for vertice := range blocco {
+		coordinate := punto{vertice.x, vertice.y}
+		coloriIntorno := calcolaColoriIntorno(p, coordinate)
+
+		for _, regolaDaVerificare := range p.regole {
+			if regolaValida := verificaRegola(regolaDaVerificare, coloriIntorno); regolaValida != nil {
+				coloriBloccoDaModificare[coordinate] = regolaValida.colore
+				regolaValida.consumo++
+				break
+			}
+		}
+	}
+
+	for vertice, nuovoColore := range coloriBloccoDaModificare {
+		if piastrella, ok := p.piastrelle[vertice]; ok {
+			piastrella.colore = nuovoColore
+		}
+	}
+}  
+\end{verbatim}
+
+
+\subsection{dfs}
+Nella funzione \texttt{dfs} ho spostato all'inizio il controllo della mappa \textit{blocco} (che se presente, implica che stia usando la funzione per ottenere le piastrelle del blocco), in modo da aggiungere anche la piastrella iniziale, mentre prima non veniva aggiunta, portando in certi casi ad un calcolo errato delle piastrelle appartenenti al blocco.
+\\ \\
+Versione originale
+\begin{verbatim}
+func dfs(
+	p piano,
+	vertice punto,
+	visite map[punto]bool,
+	blocco map[punto]*Piastrella,
+	omogeneo bool,
+	sum *int,
+) {
+	visite[vertice] = true
+	colore := p.piastrelle[vertice].colore
+
+	for _, direzione := range direzioni {
+		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
+
+		if circonvicina, ok := p.piastrelle[nuovoVertice]; ok && !visite[nuovoVertice] && circonvicina.intensità > 0 {
+			if !omogeneo || (omogeneo && circonvicina.colore == colore) {
+				if blocco != nil {
+					blocco[vertice] = circonvicina
+				}
+				if sum != nil {
+					*sum += circonvicina.intensità
+				}
+				dfs(p, nuovoVertice, visite, blocco, omogeneo, sum)
+			}
+		}
+	}
+}
+  
+\end{verbatim}
+
+Versione modificata
+\begin{verbatim}
+func dfs(
+	p piano,
+	vertice punto,
+	visite map[punto]bool,
+	blocco map[punto]*Piastrella,
+	omogeneo bool,
+	sum *int,
+) {
+	visite[vertice] = true
+	colore := p.piastrelle[vertice].colore
+
+	if blocco != nil {
+		blocco[vertice] = p.piastrelle[vertice]
+	}
+
+	for _, direzione := range direzioni {
+		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
+
+		if circonvicina, ok := p.piastrelle[nuovoVertice]; ok && !visite[nuovoVertice] && circonvicina.intensità > 0 {
+			if !omogeneo || (omogeneo && circonvicina.colore == colore) {
+				if sum != nil {
+					*sum += circonvicina.intensità
+				}
+				dfs(p, nuovoVertice, visite, blocco, omogeneo, sum)
+			}
+		}
+	}
+}
+\end{verbatim}
+
+\subsection{piastrelleCirconvicine}\label{subsec:circonvicine}
+La funzione \texttt{piastrelleCirconvicine} è stata semplificata, ed ora calcola e popola una mappa (\textit{map[punto]*Piastrella}) che poi restituisce, contenente appunto tutte le coordinate e i puntatori alle piastrelle circonvicine a quella presente nel vertice, passato come argomento alla funzione e preso come vertice di origine (o partenza).\\
+È stato rimosso il calcolo dei colori dell'intorno e la relativa mappa \textit{colori}, lasciando l'onere di quel calcolo ad una funzione ad-hoc chiamata \texttt{calcolaColoriIntorno}, e questo ha permesso anche di rimuovere un argomento alla funzione.
+\\ \\
+Versione originale
+\begin{verbatim}
+func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vicine map[punto]*Piastrella) {
+	vicine = make(map[punto]*Piastrella)
+
+	for _, direzione := range direzioni {
+		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
+
+		if piastrella, ok := p.piastrelle[nuovoVertice]; ok {
+			vicine[nuovoVertice] = piastrella
+			if colori != nil {
+				colori[piastrella.colore]++
+			}
+		}
+	}
+	return vicine
+}
+\end{verbatim}
+
+Versione modificata
+\begin{verbatim}
+func piastrelleCirconvicine(p piano, vertice punto) (vicine map[punto]*Piastrella) {
+	vicine = make(map[punto]*Piastrella)
+
+	for _, direzione := range direzioni {
+		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
+
+		if piastrella, ok := p.piastrelle[nuovoVertice]; ok {
+			vicine[nuovoVertice] = piastrella
+		}
+	}
+	return vicine
+}
+  
+\end{verbatim}
+
+
+\subsection{verificaRegola}\label{subsec:checkRule}
+La funzione \texttt{verificaRegola} è stata semplificata ed è stato rimosso il calcolo delle piastrelle circonvicine.\\
+In questa erano presenti alcuni errori, come quello di ricalcolare ad ogni iterazione le piastrelle circonvicine con la omonima funzione che popolava anche i colori, e ciò portava ad un calcolo errato per le funzioni \texttt{propaga} e \texttt{propagaBlocco}, in quanto l'intorno non veniva memorizzato nella versione originale, ma veniva ricalcolato ogni volta, riportando quindi eventuali modifiche di colori e/o altri comandi ricevuti che avevano alterato la situazione del \textit{piano}.
+\\
+Adesso la funzione riceve in input una mappa contenente i colori dell'intorno (\textit{coloriIntorno map[string]int}) che è stata memorizzata in precedenza e semplicemente verifica per la regola che deve essere valutata se i colori dell'intorno possono soddisfare tale regola.\\
+In caso positivo restituisce la regola (un puntatore ad essa), altrimenti restituisce \texttt{nil}.
+\\ \\
+Versione originale
+\begin{verbatim}
+func verificaRegola(p piano, regola *Regola, vertice punto, intensità *int) *Regola {
+	valoriColore := make(map[string]int)
+	piastrelleCirconvicine(p, vertice, valoriColore)
+
+	for colore, val := range regola.valColore {
+		if valoriColore[colore] < val {
+			return nil
+		}
+	}
+
+	piastrella, piastrellaOk := p.piastrelle[vertice]
+	if piastrellaOk {
+		*intensità = piastrella.intensità
+	}
+
+	return regola
+}
+\end{verbatim}
+
+Versione modificata
+\begin{verbatim}
+func verificaRegola(regola *Regola, coloriIntorno map[string]int) *Regola {
+	for colore, val := range regola.valColore {
+		if coloriIntorno[colore] < val {
+			return nil
+		}
+	}
+	return regola
+}
+\end{verbatim}
+
+
+\subsection{calcolaPistaBreve}
+In questa funzione, lo scopo è calcolare la pista più breve (se esiste), partendo da una piastrella di origine (\textit{verticeOrig}) ed una di destinazione (\textit{verticeDest}), e restituirne la \textit{lunghezza}.
+\\
+Erano presenti alcuni errori in questa funzione che portavano ad un calcolo errato della lunghezza della pista, a seconda dell'input.\\
+La prima modifica è stata quella di fermare direttamente la computazione, restituendo \(0\) se almeno uno (o entrambi) i vertici passati come argomento della funzione non corrispondevano a piastrelle esistenti o accese (\(\textit{intensità} > 0\)).
+\\
+La \textit{lunghezza} la calcolo ora come mappa da \textit{punto} a intero, associandola quindi alla distanza da un certo vertice (quello visitato in precedenza).\\
+Per calcolare correttamente la distanza, è necessario memorizzare quella dal vertice precedente e sommarla a \(1\) (nel caso del progetto parliamo di piastrelle con lato unitario) quando arrivo ad un nuovo vertice.
+\\
+Esempio
+\begin{verbatim}
+Pista breve A - B - C
+lunghezza[A] = 1  <- vertice di origine esistente, imposto a 1 la distanza
+lunghezza[B] = lunghezza[A] + 1
+lunghezza[C] = lunghezza[B] + 1 <- è il vertice di destinazione, calcolo e restituisco la distanza
+return lunghezza[C] 
+\end{verbatim}
+
+Imposto quindi il valore della mappa sulle coordinate della piastrella attuale come somma tra il valore della distanza del vertice precedente (\textit{lunghezza[vertice]}) e \(1\).
+\\ \\
+Ho aggiornato poi la chiamata alla funzione \texttt{piastrelleCirconvicine} con la signature della funzione aggiornata come indicato nella sezione \nameref{subsec:circonvicine}, che richiede come argomenti solo il \textit{piano} e il \textit{vertice} da cui calcolare le piastrelle circonvicine.\\
+Ho inoltre spostato il controllo del vertice che, se corrisponde a quello di destinazione, ferma la computazione e restituisce la lunghezza nell'iterazione sulle piastrelle adiacenti, il che rende la funzione leggermente più efficiente, non dovendo fare l'operazione di \textit{pop} sulla coda (\textit{queue}) (estrarre il primo elemento e rimuoverlo dalla coda, tramite subslicing) se sono arrivato nel vertice di destinazione.
+\\
+Infine, se le coordinate della piastrella attuale (\textit{coordinatePiastrella}) corrispondono a quelle della piastrella di destinazione (\textit{verticeDest}), mi fermo e restituisco la lunghezza calcolata del vertice attuale (\textit{lunghezza[coordinatePiastrella]}).
+\\ \\
+Versione originale
+\begin{verbatim}
+ func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) (lunghezza int) {
+	piastrellaOrig, origineOk := p.piastrelle[verticeOrig]
+	piastrellaDest, destOk := p.piastrelle[verticeDest]
+
+	if (!origineOk || piastrellaOrig.intensità == 0) || (!destOk || piastrellaDest.intensità == 0) {
+		lunghezza = 0
+	} else {
+		lunghezza = 1
+	}
+
+	visitate := make(map[punto]bool)
+	queue := []punto{verticeOrig}
+
+	visitate[verticeOrig] = true
+
+	for len(queue) > 0 {
+		vertice := queue[0]
+		queue = queue[1:]
+
+		if vertice == verticeDest {
+			return lunghezza
+		}
+
+		adiacenti := piastrelleCirconvicine(p, vertice, nil)
+		for _, piastrella := range adiacenti {
+			coordinatePiastrella := punto{piastrella.x, piastrella.y}
+			if !visitate[coordinatePiastrella] {
+				queue = append(queue, coordinatePiastrella)
+				visitate[coordinatePiastrella] = true
+			}
+		}
+		lunghezza++
+	}
+	return 0
+} 
+\end{verbatim}
+
+Versione modificata
+\begin{verbatim}
+func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) int {
+	piastrellaOrig, origineOk := p.piastrelle[verticeOrig]
+	piastrellaDest, destOk := p.piastrelle[verticeDest]
+
+	if (!origineOk || piastrellaOrig.intensità == 0) || (!destOk || piastrellaDest.intensità == 0) {
+		return 0
+	}
+
+	visitate := make(map[punto]bool)
+	queue := []punto{verticeOrig}
+	lunghezza := make(map[punto]int)
+
+	visitate[verticeOrig] = true
+	lunghezza[verticeOrig] = 1
+
+	for len(queue) > 0 {
+		vertice := queue[0]
+		queue = queue[1:]
+
+		adiacenti := piastrelleCirconvicine(p, vertice)
+		for _, piastrella := range adiacenti {
+			coordinatePiastrella := punto{piastrella.x, piastrella.y}
+			if !visitate[coordinatePiastrella] {
+				queue = append(queue, coordinatePiastrella)
+				visitate[coordinatePiastrella] = true
+				lunghezza[coordinatePiastrella] = lunghezza[vertice] + 1
+
+				if coordinatePiastrella == verticeDest {
+					return lunghezza[coordinatePiastrella]
+				}
+			}
+
+		}
+	}
+	return 0
+}
+\end{verbatim}
+
+\subsection{calcolaColoriIntorno}\label{subsec:calcolaColoriIntorno}
+Questa funzione non era presente inizialmente, ma l'ho creata per svolgere il compito di definire i colori dell'intorno e restituire la mappa \textit{string} a \textit{int}, dove la stringa rappresenta l'etichetta del colore e l'intero corrisponde al valore di quel colore nell'intorno.\\
+Nelle funzioni chiamanti poi memorizzerò tale mappa che corrisponderà alla situazione dei colori del piano nella condizione originale, prima di effettuare comandi che alterano la situazione del piano.
+\\ \\
+Funzione
+\begin{verbatim}
+func calcolaColoriIntorno(p piano, vertice punto) (coloriIntorno map[string]int) {
+	coloriIntorno = make(map[string]int)
+	for _, piastrella := range piastrelleCirconvicine(p, vertice) {
+		coloriIntorno[piastrella.colore]++
+	}
+
+	return coloriIntorno
+}
+\end{verbatim}
+
+\section{Altro}
+È stata rimossa anche una struct \textit{elemRegola} che non veniva utilizzata e non era stata rimossa in precedenza.\\
+Sono stati aggiunti inoltre dei \textit{file di test} nella relativa cartella.
+
+\end{document}
+

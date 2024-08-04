@@ -4,6 +4,7 @@ Title         : Progetto Laboratorio di Algoritmi & Strutture Dati @ Unimi
 Author        : Kevin Manca
 Matricola     : 978578
 Data Consegna : 10/07/2024
+Data Revisione: 05/08/2024
 ---
 */
 package main
@@ -51,12 +52,6 @@ type Regola struct {
 	colore             string         // nuovo colore della regola
 	consumo            int            // numero tot di piastrelle a cui è stata applicata la regola
 	valColore          map[string]int // mappa il colore col relativo valore
-}
-
-// elemRegola : istruzioni della regola (formato: k₁α₁ + k₂α₂ + ... + kₙαₙ → β)
-type elemRegola struct {
-	k     int    // kᵢ sono interi positivi la cui somma non supera 8
-	alpha string // stringa dell'alfabeto tutte differenti tra loro
 }
 
 // Rappresentano le direzioni di movimento nel piano
@@ -136,7 +131,6 @@ func esegui(p piano, s string) {
 		blocco(p, x, y, false)
 
 	case "p": // Propaga
-		fmt.Println("call propaga")
 		propaga(p, x, y)
 
 	case "P": // Propaga Blocco
@@ -179,8 +173,6 @@ func colora(p piano, x int, y int, alpha string, i int) {
 // Se Piastrella(x, y) è già spenta, non fa nulla.
 func spegni(p piano, x int, y int) {
 	P := punto{x, y}
-	// FIX mancava il bool per verificare che la piastrella esistesse
-	//		perciò un input tipo `S 9 9` mandava in crash il programma per un puntatore non valido
 	if tile, ok := p.piastrelle[P]; ok && tile.intensità > 0 {
 		tile.intensità = 0
 	}
@@ -259,14 +251,20 @@ func blocco(p piano, x int, y int, omogeneo bool) {
 func propaga(p piano, x int, y int) {
 	vertice := punto{x, y}
 
-	intensità := 1
+	// Calcolo i colori dell'intorno
+	coloriIntorno := calcolaColoriIntorno(p, vertice)
 
-	/* TODO
-	Ha davvero senso che mi ricalcolo ogni volta tutti i colori intorno piuttosto che farlo un unica volta? NO
-	*/
 	for _, regolaDaValidare := range p.regole {
 		// Applico solo la prima regolaValida valida e incremento il suo consumo
-		if regolaValida := verificaRegola(p, regolaDaValidare, vertice, &intensità); regolaValida != nil {
+		if regolaValida := verificaRegola(regolaDaValidare, coloriIntorno); regolaValida != nil {
+			intensità := 1
+			if piastrella, esiste := p.piastrelle[vertice]; esiste && piastrella.intensità > 0 {
+				// Se la piastrella esisteva già e non è stata spenta (intensità > 0)
+				//  coloro con l'intensità della piastrella, altrimenti è di default a 1.
+				// Non fare questo controllo comporta che la propagazione su una piastrella
+				// spenta imposta l'intensità di tutte pari a quella di quest'ultima (0)
+				intensità = piastrella.intensità
+			}
 			colora(p, x, y, regolaValida.colore, intensità)
 			regolaValida.consumo++
 			break
@@ -283,32 +281,30 @@ func propagaBlocco(p piano, x int, y int) {
 		return // Se la piastrella è spenta/non esiste, non proseguo
 	}
 
-	/* FIX
-	DA EVITARE che si rifaccia il controllo del blocco dopo che si è applicata una regola, ma è da fare
-	sul piano orgiginale prima che la regola sia stata applicata (altrimenti LOGICAMENTE CAMBIA)
-	*/
-
 	visite := make(map[punto]bool)
 	blocco := make(map[punto]*Piastrella)
 	// Calcolo le piastrelle del blocco con la `DFS` che mi aggiorna la mappa `blocco`
 	dfs(p, vertice, visite, blocco, false, nil)
 
-	if len(blocco) > 0 {
-		for vertice, piastrella := range blocco {
-			if piastrella == nil {
+	// Memorizzo i colori delle piastrelle del blocco prima di effettuare la propagazione
+	coloriBloccoDaModificare := make(map[punto]string)
+
+	for vertice := range blocco {
+		coordinate := punto{vertice.x, vertice.y}
+		coloriIntorno := calcolaColoriIntorno(p, coordinate)
+
+		for _, regolaDaVerificare := range p.regole {
+			if regolaValida := verificaRegola(regolaDaVerificare, coloriIntorno); regolaValida != nil {
+				coloriBloccoDaModificare[coordinate] = regolaValida.colore
+				regolaValida.consumo++
 				break
 			}
+		}
+	}
 
-			coordinate := punto{vertice.x, vertice.y}
-			intensità := 1
-			for _, regolaDaValidare := range p.regole {
-				if regolaValida := verificaRegola(p, regolaDaValidare, coordinate, &intensità); regolaValida != nil {
-					fmt.Println(regolaValida)
-					colora(p, coordinate.x, coordinate.y, regolaValida.colore, p.piastrelle[vertice].intensità)
-					regolaValida.consumo++
-					return
-				}
-			}
+	for vertice, nuovoColore := range coloriBloccoDaModificare {
+		if piastrella, ok := p.piastrelle[vertice]; ok {
+			piastrella.colore = nuovoColore
 		}
 	}
 }
@@ -323,9 +319,7 @@ func ordina(p piano) {
 	sort.SliceStable(p.regole, func(i, j int) bool {
 		consumoI := p.regole[i].consumo
 		consumoJ := p.regole[j].consumo
-		// fmt.Println("i =>", p.regole[i].istruzioneCompleta, " (", consumoI, ")")
-		// fmt.Println("j =>", p.regole[j].istruzioneCompleta, " (", consumoJ, ")")
-		return (consumoI < consumoJ) // && i < j || consumoI < consumoJ
+		return (consumoI == consumoJ) && i < j || consumoI < consumoJ
 	})
 }
 
@@ -384,14 +378,15 @@ func dfs(
 	visite[vertice] = true
 	colore := p.piastrelle[vertice].colore
 
+	if blocco != nil {
+		blocco[vertice] = p.piastrelle[vertice]
+	}
+
 	for _, direzione := range direzioni {
 		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
 
 		if circonvicina, ok := p.piastrelle[nuovoVertice]; ok && !visite[nuovoVertice] && circonvicina.intensità > 0 {
 			if !omogeneo || (omogeneo && circonvicina.colore == colore) {
-				if blocco != nil {
-					blocco[vertice] = circonvicina
-				}
 				if sum != nil {
 					*sum += circonvicina.intensità
 				}
@@ -401,31 +396,26 @@ func dfs(
 	}
 }
 
+// Calcola il colori dell'intorno e li memorizza in una mappa che restituisce
+func calcolaColoriIntorno(p piano, vertice punto) (coloriIntorno map[string]int) {
+	coloriIntorno = make(map[string]int)
+	for _, piastrella := range piastrelleCirconvicine(p, vertice) {
+		coloriIntorno[piastrella.colore]++
+	}
+
+	return coloriIntorno
+}
+
 // Funzione che calcola le piastrelle circonvicine alla Piastrella(x, y)
 // Restituisce la mappa `vicine`
-func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vicine map[punto]*Piastrella) {
-	// TODO controllare se è più conveniente limitare le funzioni di questa e non
-	// restituire un valore in base alla funzione ma magari splittarla in un
-	// altra funzione e usare questa solo per la BFS
+func piastrelleCirconvicine(p piano, vertice punto) (vicine map[punto]*Piastrella) {
 	vicine = make(map[punto]*Piastrella)
 
-	// dirc := []punto{
-	// 	{vertice.x - 1, vertice.y},
-	// 	{vertice.x + 1, vertice.y},
-	// 	{vertice.x, vertice.y - 1},
-	// 	{vertice.x, vertice.y + 1},
-	// 	{vertice.x - 1, vertice.y - 1},
-	// 	{vertice.x + 1, vertice.y - 1},
-	// 	{vertice.x - 1, vertice.y + 1},
-	// 	{vertice.x + 1, vertice.y + 1}}
 	for _, direzione := range direzioni {
 		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
 
 		if piastrella, ok := p.piastrelle[nuovoVertice]; ok {
-			vicine[punto{piastrella.x, piastrella.y}] = piastrella
-			if colori != nil {
-				colori[piastrella.colore]++
-			}
+			vicine[nuovoVertice] = piastrella
 		}
 	}
 	return vicine
@@ -433,26 +423,14 @@ func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vici
 
 // Verifica che una regola sia applicabile in base ai colori circostanti
 // return: nil se nessuna regola è valida, altrimenti un puntatore alla regola
-func verificaRegola(p piano, regola *Regola, vertice punto, intensità *int) *Regola {
-	fmt.Println(" stampa regola: ", regola)
-	valoriColore := make(map[string]int)
-	piastrelleCirconvicine(p, vertice, valoriColore)
-
-	// Verifico che l'insieme dei valori dei colori della regola sia minore
-	// del valore delle piastrelle circonvicine, altrimenti non posso applicare la regola
+func verificaRegola(regola *Regola, coloriIntorno map[string]int) *Regola {
 	for colore, val := range regola.valColore {
-		if valoriColore[colore] < val {
+		// Se i colori dell'intorno sono minori di quelli della regola, non posso applicarla
+		// Devono essere maggiori o uguali
+		if coloriIntorno[colore] < val {
 			return nil
 		}
 	}
-
-	// Controllo se la piastrella esiste ed è accesa, in quel caso l'intensità sarà la stessa
-	// della piastrella, altrimenti l'intensità sarà 1 di default
-	piastrella, piastrellaOk := p.piastrelle[vertice]
-	if piastrellaOk {
-		*intensità = piastrella.intensità
-	}
-
 	return regola
 }
 
@@ -491,7 +469,7 @@ func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) int {
 	piastrellaDest, destOk := p.piastrelle[verticeDest]
 
 	// Se le piastrelle di origine e destinazione non sono accese oppure non sono valide,
-	//  non posso calcolare la pista
+	//  non posso calcolare la pista, fermo direttamente la computazione
 	if (!origineOk || piastrellaOrig.intensità == 0) || (!destOk || piastrellaDest.intensità == 0) {
 		return 0
 	}
@@ -504,28 +482,19 @@ func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) int {
 	visitate[verticeOrig] = true
 	lunghezza[verticeOrig] = 1
 
-	/* TODO
-		 * Documentare le modifiche fatte
-		 * lunghezza ora è una mappa perché devo tenere conto del vertice precedente
-		 *	A - B - C
-		 *	lunghezza[A] = 0
-		 *	lunghezza[B] = lunghezza[A] + 1
-		 *	lunghezza[C] = lunghezza[B] + 1
-	   *  NOTE : prima aggiornavo solo un intero generico
-	*/
-
 	// BFS
 	for len(queue) > 0 {
+		// Dequeue: estraggo il primo elemento e lo rimuovo con la subslicing di queue
 		vertice := queue[0]
 		queue = queue[1:]
 
-		adiacenti := piastrelleCirconvicine(p, vertice, nil)
+		adiacenti := piastrelleCirconvicine(p, vertice)
 		for _, piastrella := range adiacenti {
 			coordinatePiastrella := punto{piastrella.x, piastrella.y}
 			if !visitate[coordinatePiastrella] {
 				queue = append(queue, coordinatePiastrella) // aggiorno la coda
 				visitate[coordinatePiastrella] = true       // segno la piastrella attuale come visitata
-				// aggiorno la lunghezza -> lunghezza dal vertice nella coda +1
+				// aggiorno la lunghezza -> lunghezza del vertice nella coda +1
 				lunghezza[coordinatePiastrella] = lunghezza[vertice] + 1
 
 				if coordinatePiastrella == verticeDest { // se il vertice attuale è quello di arrivo, mi fermo

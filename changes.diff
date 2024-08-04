@@ -1,0 +1,231 @@
+diff --git a/978578_manca_kevin.go b/978578_manca_kevin.go
+index ceb3515..bf7bdf2 100644
+--- a/978578_manca_kevin.go
++++ b/978578_manca_kevin.go
+@@ -4,6 +4,7 @@ Title         : Progetto Laboratorio di Algoritmi & Strutture Dati @ Unimi
+ Author        : Kevin Manca
+ Matricola     : 978578
+ Data Consegna : 10/07/2024
++Data Revisione: 05/08/2024
+ ---
+ */
+ package main
+@@ -53,12 +54,6 @@ type Regola struct {
+ 	valColore          map[string]int // mappa il colore col relativo valore
+ }
+ 
+-// elemRegola : istruzioni della regola (formato: k₁α₁ + k₂α₂ + ... + kₙαₙ → β)
+-type elemRegola struct {
+-	k     int    // kᵢ sono interi positivi la cui somma non supera 8
+-	alpha string // stringa dell'alfabeto tutte differenti tra loro
+-}
+-
+ // Rappresentano le direzioni di movimento nel piano
+ // La mappa e la relativa chiave forniscono una veloce interpretazione delle coordinate (il valore)
+ // ed è utile per la mappa delle direzioni nella funzione `calcolaPista()`
+@@ -178,7 +173,7 @@ func colora(p piano, x int, y int, alpha string, i int) {
+ // Se Piastrella(x, y) è già spenta, non fa nulla.
+ func spegni(p piano, x int, y int) {
+ 	P := punto{x, y}
+-	if tile := p.piastrelle[P]; tile.intensità > 0 {
++	if tile, ok := p.piastrelle[P]; ok && tile.intensità > 0 {
+ 		tile.intensità = 0
+ 	}
+ }
+@@ -256,11 +251,20 @@ func blocco(p piano, x int, y int, omogeneo bool) {
+ func propaga(p piano, x int, y int) {
+ 	vertice := punto{x, y}
+ 
+-	intensità := 1
++	// Calcolo i colori dell'intorno
++	coloriIntorno := calcolaColoriIntorno(p, vertice)
+ 
+ 	for _, regolaDaValidare := range p.regole {
+ 		// Applico solo la prima regolaValida valida e incremento il suo consumo
+-		if regolaValida := verificaRegola(p, regolaDaValidare, vertice, &intensità); regolaValida != nil {
++		if regolaValida := verificaRegola(regolaDaValidare, coloriIntorno); regolaValida != nil {
++			intensità := 1
++			if piastrella, esiste := p.piastrelle[vertice]; esiste && piastrella.intensità > 0 {
++				// Se la piastrella esisteva già e non è stata spenta (intensità > 0)
++				//  coloro con l'intensità della piastrella, altrimenti è di default a 1.
++				// Non fare questo controllo comporta che la propagazione su una piastrella
++				// spenta imposta l'intensità di tutte pari a quella di quest'ultima (0)
++				intensità = piastrella.intensità
++			}
+ 			colora(p, x, y, regolaValida.colore, intensità)
+ 			regolaValida.consumo++
+ 			break
+@@ -282,20 +286,25 @@ func propagaBlocco(p piano, x int, y int) {
+ 	// Calcolo le piastrelle del blocco con la `DFS` che mi aggiorna la mappa `blocco`
+ 	dfs(p, vertice, visite, blocco, false, nil)
+ 
+-	if len(blocco) > 0 {
+-		for vertice, piastrella := range blocco {
+-			if piastrella == nil {
++	// Memorizzo i colori delle piastrelle del blocco prima di effettuare la propagazione
++	coloriBloccoDaModificare := make(map[punto]string)
++
++	for vertice := range blocco {
++		coordinate := punto{vertice.x, vertice.y}
++		coloriIntorno := calcolaColoriIntorno(p, coordinate)
++
++		for _, regolaDaVerificare := range p.regole {
++			if regolaValida := verificaRegola(regolaDaVerificare, coloriIntorno); regolaValida != nil {
++				coloriBloccoDaModificare[coordinate] = regolaValida.colore
++				regolaValida.consumo++
+ 				break
+ 			}
++		}
++	}
+ 
+-			coordinate := punto{vertice.x, vertice.y}
+-			intensità := 1
+-			for _, regolaDaValidare := range p.regole {
+-				if regolaValida := verificaRegola(p, regolaDaValidare, coordinate, &intensità); regolaValida != nil {
+-					colora(p, coordinate.x, coordinate.y, regolaValida.colore, p.piastrelle[vertice].intensità)
+-					regolaValida.consumo++
+-				}
+-			}
++	for vertice, nuovoColore := range coloriBloccoDaModificare {
++		if piastrella, ok := p.piastrelle[vertice]; ok {
++			piastrella.colore = nuovoColore
+ 		}
+ 	}
+ }
+@@ -369,14 +378,15 @@ func dfs(
+ 	visite[vertice] = true
+ 	colore := p.piastrelle[vertice].colore
+ 
++	if blocco != nil {
++		blocco[vertice] = p.piastrelle[vertice]
++	}
++
+ 	for _, direzione := range direzioni {
+ 		nuovoVertice := calcolaDeltaVertice(vertice, direzione.x, direzione.y)
+ 
+ 		if circonvicina, ok := p.piastrelle[nuovoVertice]; ok && !visite[nuovoVertice] && circonvicina.intensità > 0 {
+ 			if !omogeneo || (omogeneo && circonvicina.colore == colore) {
+-				if blocco != nil {
+-					blocco[vertice] = circonvicina
+-				}
+ 				if sum != nil {
+ 					*sum += circonvicina.intensità
+ 				}
+@@ -386,9 +396,19 @@ func dfs(
+ 	}
+ }
+ 
++// Calcola il colori dell'intorno e li memorizza in una mappa che restituisce
++func calcolaColoriIntorno(p piano, vertice punto) (coloriIntorno map[string]int) {
++	coloriIntorno = make(map[string]int)
++	for _, piastrella := range piastrelleCirconvicine(p, vertice) {
++		coloriIntorno[piastrella.colore]++
++	}
++
++	return coloriIntorno
++}
++
+ // Funzione che calcola le piastrelle circonvicine alla Piastrella(x, y)
+ // Restituisce la mappa `vicine`
+-func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vicine map[punto]*Piastrella) {
++func piastrelleCirconvicine(p piano, vertice punto) (vicine map[punto]*Piastrella) {
+ 	vicine = make(map[punto]*Piastrella)
+ 
+ 	for _, direzione := range direzioni {
+@@ -396,9 +416,6 @@ func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vici
+ 
+ 		if piastrella, ok := p.piastrelle[nuovoVertice]; ok {
+ 			vicine[nuovoVertice] = piastrella
+-			if colori != nil {
+-				colori[piastrella.colore]++
+-			}
+ 		}
+ 	}
+ 	return vicine
+@@ -406,25 +423,14 @@ func piastrelleCirconvicine(p piano, vertice punto, colori map[string]int) (vici
+ 
+ // Verifica che una regola sia applicabile in base ai colori circostanti
+ // return: nil se nessuna regola è valida, altrimenti un puntatore alla regola
+-func verificaRegola(p piano, regola *Regola, vertice punto, intensità *int) *Regola {
+-	valoriColore := make(map[string]int)
+-	piastrelleCirconvicine(p, vertice, valoriColore)
+-
+-	// Verifico che l'insieme dei valori dei colori della regola sia minore
+-	// del valore delle piastrelle circonvicine, altrimenti non posso applicare la regola
++func verificaRegola(regola *Regola, coloriIntorno map[string]int) *Regola {
+ 	for colore, val := range regola.valColore {
+-		if valoriColore[colore] < val {
++		// Se i colori dell'intorno sono minori di quelli della regola, non posso applicarla
++		// Devono essere maggiori o uguali
++		if coloriIntorno[colore] < val {
+ 			return nil
+ 		}
+ 	}
+-
+-	// Controllo se la piastrella esiste ed è accesa, in quel caso l'intensità sarà la stessa
+-	// della piastrella, altrimenti l'intensità sarà 1 di default
+-	piastrella, piastrellaOk := p.piastrelle[vertice]
+-	if piastrellaOk {
+-		*intensità = piastrella.intensità
+-	}
+-
+ 	return regola
+ }
+ 
+@@ -458,42 +464,45 @@ func calcolaPista(p piano, vertice punto, seqDirezioni []string, pistaDaStampare
+ 
+ // Calcola la pista più breve, utilizza una `BFS` che aggiorna la mappa `pistaBreve`
+ // return: la lunghezza della pista più breve, 0 altrimenti
+-func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) (lunghezza int) {
++func calcolaPistaBreve(p piano, verticeOrig punto, verticeDest punto) int {
+ 	piastrellaOrig, origineOk := p.piastrelle[verticeOrig]
+ 	piastrellaDest, destOk := p.piastrelle[verticeDest]
+ 
+ 	// Se le piastrelle di origine e destinazione non sono accese oppure non sono valide,
+-	//  non posso calcolare la pista
++	//  non posso calcolare la pista, fermo direttamente la computazione
+ 	if (!origineOk || piastrellaOrig.intensità == 0) || (!destOk || piastrellaDest.intensità == 0) {
+-		lunghezza = 0
+-	} else {
+-		lunghezza = 1
++		return 0
+ 	}
+ 
+ 	// Inizializzazione
+ 	visitate := make(map[punto]bool)
+ 	queue := []punto{verticeOrig}
++	lunghezza := make(map[punto]int)
+ 	// Aggiungo il primo vertice di origine alla mappa delle visite
+ 	visitate[verticeOrig] = true
++	lunghezza[verticeOrig] = 1
+ 
+ 	// BFS
+ 	for len(queue) > 0 {
++		// Dequeue: estraggo il primo elemento e lo rimuovo con la subslicing di queue
+ 		vertice := queue[0]
+ 		queue = queue[1:]
+ 
+-		if vertice == verticeDest { // se il vertice attuale è quello di arrivo, mi fermo
+-			return lunghezza
+-		}
+-
+-		adiacenti := piastrelleCirconvicine(p, vertice, nil)
++		adiacenti := piastrelleCirconvicine(p, vertice)
+ 		for _, piastrella := range adiacenti {
+ 			coordinatePiastrella := punto{piastrella.x, piastrella.y}
+ 			if !visitate[coordinatePiastrella] {
+ 				queue = append(queue, coordinatePiastrella) // aggiorno la coda
+ 				visitate[coordinatePiastrella] = true       // segno la piastrella attuale come visitata
++				// aggiorno la lunghezza -> lunghezza del vertice nella coda +1
++				lunghezza[coordinatePiastrella] = lunghezza[vertice] + 1
++
++				if coordinatePiastrella == verticeDest { // se il vertice attuale è quello di arrivo, mi fermo
++					return lunghezza[coordinatePiastrella]
++				}
+ 			}
++
+ 		}
+-		lunghezza++
+ 	}
+ 	return 0
+ }

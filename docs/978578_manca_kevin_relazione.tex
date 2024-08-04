@@ -31,8 +31,6 @@ altri file richiesti dalla specifica:
 
  - Cartella di test: \texttt{test/} che contiene ulteriori sottocartelle con i file utilizzati per il testing del programma
 
- - File \texttt{go.mod}: utilizzato principalmente per definire modulo e versione di go e per l'utilizzo di \texttt{go test} da linea di comando
-
 
 \subsection{Problema}
 Il problema imposto dalla specifica è quello di studiare le configurazioni di insiemi di piastrelle digitali su un piano, e la loro influenza sulle piastrelle circonvicine.\\
@@ -172,15 +170,17 @@ Viene preventivamente verificato che le coordinate passate corrispondano ad una 
 \textbf{Spazio}: \(O(n)\) per la mappa delle \textit{visite} nel caso peggiore di \(n\) piastrelle
 
 \subsection{propaga}\label{sec:prop}
-Applica la prima regola valida a una piastrella specifica, se nessuna regola valida viene trovata (la funzione di utilità "\nameref{subsec:checkRule}" restituisce \textit{nil}) non fa niente, altrimenti viene effettuata la funzione "\nameref{subsec:color}" e viene incrementato il \textit{consumo} di tale \textit{regola}.\\ \\
-\textbf{Tempo}: \(O(R \cdot C)\) nel caso peggiore, dove \(R\) è il numero di regole e \(C\) è il numero di colori per regola
-\textbf{Spazio}: \(O(1)\), non vengono utilizzate strutture dati aggiuntive, ma quelle già esistenti (quindi una quantità di memoria costante)
+Calcola i colori dell'intorno tramite la funzione \nameref{subsec:evalColorsAround}, che vengono poi passati alla funzione \nameref{subsec:checkRule}, la quale restituisce la regola valida da applicare (se esiste), richiamando la funzione "\nameref{subsec:color}" e incrementando il \textit{consumo} di tale \textit{regola}.\\
+Se nessuna regola valida viene trovata (la funzione di utilità "\nameref{subsec:checkRule}" restituisce \textit{nil}) e questa funzione non fa niente.
+\\ \\
+\textbf{Tempo}: \(O(R \cdot C)\) nel caso peggiore, dove \(R\) è il numero di regole e \(C\) è il numero di colori per regola\\
+\textbf{Spazio}: \(O(1)\), non vengono utilizzate strutture dati aggiuntive tranne la mappa che comporta comunque una quantità di memoria massima richiesta costante
 
 \subsection{propagaBlocco}\label{sec:propBlock}
 Propaga il colore su un blocco di piastrelle dove appartiene la piastrella di coordinate \((x,\ y)\) passate come parametro.\\
 Utilizzo la \nameref{subsec:dfs} (\(O(n\ +\ m)\)) per ottenere il \textit{blocco} di appartenenza della piastrella(x, y), itero sulle piastrelle del blocco (\(O(v)\)) e all'interno dell'iterazione, per ogni piastrella, verifico la validità della regola (\(O(r)\))\\ \\
-\textbf{Tempo}: \(O(n) + O(m \cdot r)\), \(n\) è il numero di piastrelle nel blocco, \(m\) è il numero di regole, e \(r\) è il numero di regole; essendo un piano, si può semplificare \(n \approx m\), perciò \(O(n\ +\ n \cdot r)\)\\
-\textbf{Spazio}: \(O(n)\) nel caso peggiore tutte le strutture dati di memorizzazione hanno \(O(n)\), sia per la mappa \textit{visite}, la \textit{DFS}, che lo \textit{stack di ricorsione}
+\textbf{Tempo}: \(O(n \cdot r \cdot c)\), \(n\) è il numero di piastrelle nel blocco, \(r\) è il numero di regole, e \(c\) è il numero di colori nella regola\\
+\textbf{Spazio}: \(O(n)\) nel caso peggiore tutte le strutture dati di memorizzazione hanno \(O(n)\), sia per la mappa \textit{visite}, la \textit{DFS}, che lo \textit{stack di ricorsione}, pari alla dimensione del \textit{blocco} in questo caso
 
 \subsection{ordina}
 Ordina le \textit{regole di propagazione} (specificate nella sezione "\nameref{subsec:rule}") per \textit{consumo}.\\
@@ -222,7 +222,7 @@ Sono presenti infatti un \textit{booleano omogeneo}, una \textit{mappa blocco} e
   \item \textbf{sum} \textit{*int}: nel caso di \textit{blocco/blocco omogeneo}, conterrà l'indirizzo di un intero inizializzato nella funzione chiamante (\textit{blocco()}), questo per sommare il valore dell'intensità delle piastrelle in loco ed evitare di restituire valori; sarà \textit{nil} se non è richiesta la somma come nella funzione \nameref{sec:propBlock}
 \end{itemize}
 
-\textbf{Tempo}: \(O(n\ +\ m)\), \(n\) numero di piastrelle nel blocco, \(m\) numero di archi
+\textbf{Tempo}: \(O(V\ +\ E)\), \(V\) numero di piastrelle nel blocco, \(E\) numero di archi
 \begin{itemize}
   \item \(O(1)\): aggiunta vertice alla mappa
   \item \(O(1)\): per iterazione sulle direzioni possibili (8 nel caso del progetto)
@@ -238,21 +238,17 @@ Sono presenti infatti un \textit{booleano omogeneo}, una \textit{mappa blocco} e
 \end{itemize}
 
 \subsection{piastrelleCirconvicine}
-Restituisce le piastrelle circonvicine (definite nella sezione "\nameref{sec:tiles}") come una mappa (\textit{map[punto]*Piastrella}), partendo da un vertice (\textit{punto}) di origine, seguendo le 8 direzioni possibili, e se viene passato anche il 3° parametro (\textit{co
-lori map[string]int}), cioè diverso da \textit{nil} aggiorna la mappa dei colori delle piastrelle circostanti.\\ \\
-\textbf{Tempo}: \(O(1)\), \textit{for-range} esegue 8 iterazioni (sono 8 le direzioni), mantenendo costante l'accesso alla mappa ed eventualmente aggiungendo un elemento a quest'ultima (in \(O(1)\)), e la stessa cosa avviene per la mappa colori se deve essere aggiornata\\
-\textbf{Spazio}: \(O(1)\), la mappa \textit{vicine} contiene al massimo 8 elementi, mentre quella \textit{colori} non richiede ulteriore spazio in quanto passata per riferimento
+Restituisce le piastrelle circonvicine (definite nella sezione "\nameref{sec:tiles}") come una mappa (\textit{map[punto]*Piastrella}), partendo da un vertice (\textit{punto}) di origine, seguendo le 8 direzioni possibili.
+\\ \\
+\textbf{Tempo}: \(O(1)\), \textit{for-range} esegue 8 iterazioni (sono 8 le direzioni), mantenendo costante l'accesso alla mappa ed eventualmente aggiungendo un elemento a quest'ultima (in \(O(1)\))\\
+\textbf{Spazio}: \(O(1)\), la mappa \textit{vicine} contiene al massimo 8 elementi
 
 \subsection{verificaRegola}\label{subsec:checkRule}
-Restituisce la \textit{prima regola} valida (applicabile) su una piastrella e ne aggiorna il \textit{consumo}, in caso nessuna regola può essere applicata non vengono effettuate altre operazioni.\\
-Nel dettaglio, verifico le piastrelle circonvicine e i loro colori e successivamente controllo se la regola che sto valutando può essere applicata, cioè se il valore dei colori dell'intorno è sufficiente al valore dei colori della regola.\\ \\
+Verifica che i colori della mappa dell'intorno passato come argomento (\textit{coloriIntorno map[string]int}), siano sufficienti a soddisfare quelli della regola in esame.\\
+In caso affermativo, restituisce tale regola (un puntatore ad essa), altrimenti restituisce \textit{nil}.
+\\ \\
 \textbf{Tempo}: \(O(c)\), \(c\) pari al numero di colori distinti, che essendo limitato cresce in modo lineare rispetto al suo numero\\
-\begin{itemize}
-  \item \(O(1)\): creazione mappa \textit{valoriColore}
-  \item \(O(1)\): funzione \textit{piastrelleCirconvicine} come precedentemente indicato
-  \item \(O(c)\): ciclo di iterazione sui colori indicati dalla regola, numero massimo di colori pari a \(c\)
-\end{itemize}
-\textbf{Spazio}: \(O(1)\), la mappa \textit{valoriColore} contiene al massimo 8 colori (pari a tutte le piastrelle circonvicine di colore diverso) garantendo un tempo trascurabile e costante
+\textbf{Spazio}: \(O(1)\), la mappa \textit{valoriColore} contiene al massimo 8 colori, pari a tutte le piastrelle circonvicine di colore, diverso garantendo l'utilizzo di spazio aggiuntivo costante
 
 \subsection{calcolaPista}\label{subsec:getPista}
 Calcola la \textit{pista} (definita nella sezione "\nameref{sec:pista}"), seguendo la sequenza di direzioni passate come parametro ed aggiorna la \textit{stringa da stampare} (come richiesto da specifica) se tale pista è definita. Se la pista non esiste, non restituisce nulla e la stringa da stampare sarà vuota.\\
@@ -275,40 +271,59 @@ La funzione \textit{calcolaPistaBreve}, compresa la \textit{BFS} è stata implem
   \item \(O(V\ +\ E)\): fin quando la \textit{coda} non è \textit{vuota}, algoritmo \textit{BFS} (\(V\) vertici, \(E\) archi)
   \begin{itemize}
     \item estraggo il primo vertice della coda
-    \item se il vertice estratto è quello di arrivo, fermo la computazione e restituisco la \textit{lunghezza}
     \item ottengo le piastrelle circonvicine al vertice corrente
     \item per ogni piastrella adiacente, non ancora visitata, la aggiungo alla coda e segno come visitata
-    \item incremento alla fine la \textit{lunghezza}
-    \item se la coda è vuota e non ho trovato il vertice, non esiste una pista e la lunghezza è \(0\) come da specifica
+    \item incremento la \textit{lunghezza} di quel vertice, come somma della distanza del vertice precedente e \(1\)
+    \item controllo se il vertice che sto segnando come visitato e di cui ho incrementato la distanza sia quello di arrivo, in quel caso, fermo la computazione e restituisco il valore della \textit{lunghezza} per quel vertice
+    \item se la coda è vuota e non ho trovato il vertice, non esiste una pista e restituisco \(0\) come valore di lunghezza (come da specifica)
   \end{itemize}
 \end{itemize}
 
 \textbf{Tempo}: \(O(V\ +\ E)\), con \(V\) numero di piastrelle del piano da esplorare, \(E\) numero di archi (vertici in comune delle piastrelle)\\
 \begin{itemize}
   \item \(O(1)\): Inizializzo le strutture dati e inserisco la \textit{piastrella d'origine} nella coda
-  \item \(O(1)\): verifico che la piastrella attuale sia quella di \textit{arrivo} ed in quel caso 
+  \item \(O(1)\): verifico che la piastrella attuale sia quella di \textit{arrivo}, accesso in tempo costante alla mappa 
   \item \(O(V\ +\ E)\): ciclo della \textit{BFS}, quindi per ogni \textit{piastrella circonvicina}
 \end{itemize}
 La complessità temporale di questa funzione è influenzata quindi dalla \textbf{BFS}.\\
-\textbf{Spazio}: \(O(V)\), vertici \(V\) memorizzati (piastrelle) nelle mappe, proporzionalmente al loro numero; le variabili locali utilizzate hanno un costo di spazio pari a \(O(1)\)\\
+\textbf{Spazio}: \(O(V)\), vertici \(V\) memorizzati (piastrelle) nelle mappe, proporzionalmente al loro numero.
+\\ \\
 \begin{itemize}
   \item \(O(V)\): la \textit{coda} contiene al massimo \(V\) vertici
   \item \(O(V)\): la mappa \textit{visitate} tiene traccia di \(V\) vertici visitati (piastrelle)
+  \item \(O(V)\): la mappa \textit{lunghezza[punto]int} tiene traccia delle distanze \(V\) vertici visitati da quelli precedenti
 \end{itemize}
 
-\section{Requisiti e Testing}
-Per testare ed utilizzare il programma contenuto all'interno di questo archivio sono sufficienti una versione di \textbf{go} recente presente nel \textit{\$PATH} ed una \textit{shell} dove eseguire alcuni semplici comandi.
-Se questi requisiti sono soddisfatti, dopo essersi posizionati nella cartella principale (978578\_manca\_kevin) basta eseguire il comando \textit{go build} che assembla il codice sorgente presente nel \textit{file go} che contiene la funzione \textit{main}, generando un eseguibile, e successivamente eseguire \textit{go test} che eseguirà tutte le funzioni presenti nel file \textbf{*\_test.go}.\\
-Un altro possibile metodo è quello di utilizzare l'eseguibile generato dal comando \textit{go build} e reindirizzarli dei file di input o usare il pipe per ottenere il risultato.
-Ecco alcuni esempi con i \textit{placeholder} da sostituire
+\subsection{calcolaColoriIntorno}\label{subsec:evalColorsAround}
+Popola e restituisce una mappa (\textit{map[string]int}) costituita dalle etichette di colore (\textit{string}) e il relativo valore (\textit{int}) nell'intorno di piastrelle.
+\\ \\
+\textbf{Tempo}: \(O(1)\), \textit{for-range} esegue 8 iterazioni (sono 8 le direzioni, quindi il numero delle piastrelle vicine è costante), mantenendo costante l'accesso alla mappa ed eventualmente aggiungendo un elemento a quest'ultima (in \(O(1)\))\\
+\textbf{Spazio}: \(O(1)\), la mappa \textit{coloriIntorno} contiene al massimo 8 elementi distinti
 
-\begin{lstlisting}[language=bash, caption=Esempio comandi shell, label=shellcode, basicstyle=\small]
+
+\section{Requisiti e Testing}
+Per testare ed utilizzare il programma contenuto all'interno di questo archivio sono sufficienti una versione di \textbf{go} recente presente nel \textit{\$PATH} ed una \textit{shell} dove eseguire alcuni semplici comandi.\\
+Se questi requisiti sono soddisfatti, dopo essersi posizionati nella cartella principale (978578\_manca\_kevin), è sufficiente eseguire i seguenti comandi:
+
+\begin{itemize}
+  \item{\texttt{go mod init 978578\_manca\_kevin}}: crea un file \textit{go.mod} nella cartella radice del progetto (serve per indicare la posizione dei test e la versione di go)\\
+  \item{\texttt{go build}}: che assembla il codice sorgente presente nel \textit{file *.go} contenente la funzione \textit{main}, generando un eseguibile\\ 
+  \item{\texttt{go test}}: esegue tutte le funzioni presenti nel file \textbf{*\_test.go} (è possibile aggiungere la flag \texttt{-v} per un risultato più verboso contenente tutti i test eseguiti)\\
+
+\end{itemize}
+Un altro possibile metodo è quello di utilizzare l'eseguibile generato dal comando \textit{go build} e reindirizzarli dei file di input o usare il pipe per ottenere il risultato.
+\\
+Ecco alcuni esempi con i \textit{placeholder} da sostituire
+\begin{lstlisting}[language=bash, caption=Comandi shell, basicstyle=\small]
 cd "978578_manca_kevin"
+go mod init 978578_manca_kevin
 go build
 # Utilizzando il file eseguibile (passando delle stringhe separate da '\n')
 echo "STRINGA_COMANDO" | ./978578_manca_kevin
 # Utilizzando il file eseguibile e reindirizzando l'input dei file da testare
 ./978578_manca_kevin < FILE_INPUT
+# Senza l'utilizzo del file eseguibile, direttamente tramite go run
+go run 978578_manca_kevin.go < FILE_INPUT
 # oppure
 echo "STRINGA_COMANDO" | go run ./978578_manca_kevin.go
 \end{lstlisting}
@@ -333,13 +348,11 @@ Ecco alcuni esempi:\\
   \end{minipage}
   \hfill
   \begin{minipage}[t]{0.45\textwidth}
-  \begin{itemize}
   \begin{verbatim}
   9
   4
   4
   \end{verbatim}
-  \end{itemize}
   \end{minipage}
   Questo esempio mostra come il calcolo di \textit{blocco} e \textit{blocco omogeneo} applicato nella stessa piastrella(\(1,\ 1\)) restituisce nel primo caso l'intensità pari a quella totale delle piastrelle inizializzate è pari a \(2+2+5 = 9\), mentre nel secondo caso \(2+2 = 4\) in quanto la piastrella (\(1,\ 0\)) non ha lo stesso colore della piastrella sulla quale viene chiamato il blocco.\\
 
@@ -359,14 +372,12 @@ Ecco alcuni esempi:\\
   \end{minipage}
   \hfill
   \begin{minipage}[t]{0.45\textwidth}
-  \begin{itemize}
   \begin{verbatim}
   (
   v: 1 g 1 r
   m: 2 g
   )
   \end{verbatim}
-  \end{itemize}
   \end{minipage}
   Con le piastrelle di coordinate (\(2,\ 2\)), (\(2,\ 3\)), (\(2,\ 0\)), e le regole definite questo esempio mostra come la propagazione del colore tramite \textit{propaga} e \textit{propagaBlocco}.\\ 
   La propagazione sulla piastrella (\(2,\ 2\)) comporta che la prima regola venga applicata (\textit{r v 1 g 1 r}) ricolorando la piastrella di \texttt{v}.\\
@@ -377,8 +388,8 @@ Ecco alcuni esempi:\\
     \item Piastrella(2, 3): g 2
     \item Piastrella(2, 1): r 5
   \end{itemize}
-  \\
-  \item  Esempio input \textit{pista} e \textit{lung} e il loro output\\
+
+\item Esempio input \textit{pista} e \textit{lung} e il loro output\\
   \begin{minipage}[t]{0.45\textwidth}
   \begin{verbatim}
   C 3 0 r 8
@@ -391,7 +402,7 @@ Ecco alcuni esempi:\\
   \end{minipage}
   \hfill
   \begin{minipage}[t]{0.45\textwidth}
-  \begin{itemize}
+  % \begin{itemize}
   \begin{verbatim}
   [
   3 0 r 8
@@ -400,7 +411,7 @@ Ecco alcuni esempi:\\
   ]
   2
   \end{verbatim}
-  \end{itemize}
+  % \end{itemize}
   \end{minipage}
   Con le piastrelle di coordinate (\(3,\ 0\)), (\(2,\ 1\)), (\(2,\ 2\)), viene mostrato nell'esempio la \textit{pista} risultante e la sua \textit{lunghezza}.\\ 
   La \textit{pista}, seguendo le \textit{direzioni NO,NN} partendo dalla piastrella(\(3,\ 0\)) risulta appunto \((3,\ 0) \rightarrow\ (2,\ 1)\ \rightarrow\ (2,\ 2)\).\\
